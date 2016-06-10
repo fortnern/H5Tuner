@@ -41,9 +41,9 @@
     }
 
 /* MSC - Needs a test */
-void set_gpfs_parameter(mxml_node_t *tree, char *parameter_name, char *filename, /* OUT */ char **new_filename)
+void set_gpfs_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, /* OUT */ char **new_filename)
 {
-    char *node_file_name;
+    const char *node_file_name;
     mxml_node_t *node;
 
     for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL, MXML_DESCEND);
@@ -56,17 +56,11 @@ void set_gpfs_parameter(mxml_node_t *tree, char *parameter_name, char *filename,
         if((node_file_name == NULL) || (strstr(filename, node_file_name) != NULL))  {
             if(strcmp(parameter_name, "IBM_lockless_io") == 0) {
                 if(strcmp(node->child->value.text.string, "true") == 0) {
-                /* to prefix the filename with "bglockless:". */
+                    /* to prefix the filename with "bglockless:". */
+                    *new_filename = (char *) malloc(sizeof(char) * (strlen(filename) + sizeof("bglockless:")));
 
-                char *new_filename = NULL;
-                new_filename = (char *) malloc(sizeof(char) * (strlen(filename) + size of "bglockless:"));
-
-                strcpy(new_filename, "bglockless:");
-                strcat(new_filename, filename);
-#ifdef DEBUG
-                /* printf("Changing the filename from %s to %s\n", filename, new_filename); */
-#endif
-                strcpy(filename, new_filename);
+                    strcpy(*new_filename, "bglockless:");
+                    strcat(*new_filename, filename);
                 }
             }
         }
@@ -115,10 +109,10 @@ void set_mpi_parameter(mxml_node_t *tree, char *parameter_name, const char *file
     }
 }
 
-(tree, "chunk", "D1", space_id);
+/*(tree, "chunk", "D1", space_id);
 
 set_hdf5_fcreate_parameter(file_name, ...)
-set_hdf5_dcreate_parameter(file_name, dataset_name, ...);
+set_hdf5_dcreate_parameter(file_name, dataset_name, ...);*/
 
 /* MSC - This is not tested with chunk and will no get in to chunk setting with H5Dcreate() */
 hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, hid_t fapl_id)
@@ -152,7 +146,7 @@ hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *fi
                 /* printf("H5Tuner: setting Threshold=%s; Alignment=%s\n", threshold, alignment); */
 #endif
 
-                herr_t ierr = H5Pset_alignment(fapl_id, stroull(threshold,(char **)NULL,10), stroull(alignment,(char **)NULL,10));
+                herr_t ierr = H5Pset_alignment(fapl_id, (hsize_t)strtoll(threshold, NULL, 10), (hsize_t)strtoll(alignment, NULL, 10));
             }
             else if(strcmp(parameter_name, "chunk") == 0) {
                 const char* variable_name = mxmlElementGetAttr(node, "VariableName");
@@ -172,10 +166,10 @@ hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *fi
     printf("dims[2] = %d, ndims = %d\n", dims[2], ndims); */
 #endif
 
-                    hsize_t *chunk_arr = (hsize_t *) malloc(sizeof(hsize_t) * ndims);
+                    hsize_t *chunk_arr = (hsize_t *)malloc(sizeof(hsize_t) * ndims);
                     int i;
 
-                    chunk_arr[0] = stroull(strtok(node->child->value.text.string, ","),(char **)NULL,10);
+                    chunk_arr[0] = (hsize_t)strtoll(strtok(node->child->value.text.string, ","), NULL, 10);
                     if(chunk_arr[0] > dims[0])
                         return 0;
 #ifdef DEBUG
@@ -183,7 +177,7 @@ hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *fi
 #endif
                     for(i = 1; i < ndims; i++) {
                                         /* MSC - same is above */
-                        chunk_arr[i] = stroull(strtok(NULL, ","),(char **)NULL,10);
+                        chunk_arr[i] = (hsize_t)strtoll(strtok(NULL, ","), NULL, 10);
                         if(chunk_arr[i] > dims[i])
                           return 0;
                         #ifdef DEBUG
@@ -215,8 +209,10 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 {
     hid_t ret_value = -1;
     herr_t ret = -1;
+    int mpi_code;
     FILE *fp;
     mxml_node_t *tree;
+    char *new_filename = NULL;
 
     MAP_OR_FAIL(H5Fcreate);
 
@@ -264,7 +260,7 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 #endif
         mpi_code = MPI_Info_create(&orig_info);
         if(mpi_code != MPI_SUCCESS)
-            return ++error;
+            return -1;
     }
     else {
 
@@ -277,11 +273,11 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
       int nkeys = -1;
       mpi_code = MPI_Info_get_nkeys(orig_info, &nkeys);
       if(mpi_code != MPI_SUCCESS)
-          return ++error;
+          return -1;
       /* printf("H5Tuner: MPI_Info object has %d keys\n", nkeys); */
 #endif
 
-    set_gpfs_parameter(tree, "IBM_lockless_io", filename);
+    set_gpfs_parameter(tree, "IBM_lockless_io", filename, &new_filename);
     set_mpi_parameter(tree, "IBM_largeblock_io", filename, &orig_info);
 
     set_mpi_parameter(tree, "striping_factor", filename, &orig_info);
@@ -297,7 +293,7 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 #ifdef DEBUG
       mpi_code = MPI_Info_get_nkeys(orig_info, &nkeys);
       if(mpi_code != MPI_SUCCESS)
-          return ++error;
+          return -1;
     /* printf("H5Tuner: completed parameters setting \n");
     printf("H5Tuner created MPI_Info object has %d keys!\n", nkeys); */
 #endif
@@ -320,7 +316,10 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 #ifdef DEBUG
       /* printf("\nH5Tuner: calling H5Fcreate.\n"); */
 #endif
-    ret_value = __fake_H5Fcreate(filename, flags, fcpl_id, fapl_id);
+    ret_value = __fake_H5Fcreate(new_filename ? new_filename : filename, flags, fcpl_id, fapl_id);
+
+    free(new_filename);
+    new_filename = NULL;
 
     return ret_value;
 }
