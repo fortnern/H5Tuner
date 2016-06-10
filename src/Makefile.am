@@ -11,10 +11,10 @@ libautotuner_la_LIBADD = @AM_MXML_LIB@
 all: ../lib/libautotuner_static.a ../lib/libautotuner.so
 
 ../lib/autotuner_hdf5_static.o: autotuner_hdf5_static.c autotuner.h
-				$(CC) $(CFLAGS) @AM_CFLAGS@ -c $< -o $@ @AM_HDF5_LIB@ $(HDF5_LIB) $(MXML_LIB) @AM_MXML_LIB@ @AM_ADDFLAGS@
+				$(CC) $(CPPFLAGS) $(CFLAGS) @AM_CFLAGS@ -c $< -o $@ @AM_HDF5_LIB@ $(HDF5_LIB) $(MXML_LIB) @AM_MXML_LIB@ @AM_ADDFLAGS@
 
 ../lib/autotuner_hdf5.po: autotuner_hdf5.c autotuner.h
-				$(CC) $(CFLAGS_SHARED) @AM_CFLAGS_SHARED@	$(LDFLAGS_SHARED) @AM_LDFLAGS_SHARED@ -c $< -o $@ @AM_ADDFLAGS_SHARED@
+				$(CC) $(CPPFLAGS) $(CFLAGS_SHARED) @AM_CFLAGS_SHARED@	$(LDFLAGS_SHARED) @AM_LDFLAGS_SHARED@ -c $< -o $@ @AM_ADDFLAGS_SHARED@
 
 ../lib/libautotuner_static.a: ../lib/autotuner_hdf5_static.o
 				ar rcs $@ $^
