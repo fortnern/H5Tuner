@@ -31,7 +31,7 @@
     }
 
 /* MSC - Needs a test */
-herr_t set_gpfs_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, /* OUT */ char **new_filename)
+herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, /* OUT */ char **new_filename)
 {
     const char *node_file_name;
     mxml_node_t *node;
@@ -67,7 +67,7 @@ done:
 }
 
 
-herr_t set_mpi_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, MPI_Info *orig_info)
+herr_t set_mpi_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, MPI_Info *orig_info)
 {
     const char *node_file_name;
     mxml_node_t *node;
@@ -98,8 +98,8 @@ done:
 set_hdf5_fcreate_parameter(file_name, ...)
 set_hdf5_dcreate_parameter(file_name, dataset_name, ...);*/
 
-/* MSC - This is not tested with chunk and will no get in to chunk setting with H5Dcreate() */
-hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, hid_t fapl_id)
+
+hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, hid_t fapl_id)
 {
     const char *node_file_name;
     mxml_node_t *node;
@@ -120,6 +120,8 @@ hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *fi
             if(!strcmp(parameter_name, "sieve_buf_size")) {
                 if(H5Pset_sieve_buf_size(fapl_id, atoi(node->child->value.text.string)) < 0)
                     ERROR("Unable to set sieve buffer size");
+
+                break;
             }
             else if(!strcmp(parameter_name, "alignment")) {
                 char *threshold = strtok(node->child->value.text.string, ",");
@@ -135,57 +137,106 @@ hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *fi
 #endif
                 if(H5Pset_alignment(fapl_id, (hsize_t)strtoll(threshold, NULL, 10), (hsize_t)strtoll(alignment, NULL, 10)) < 0)
                     ERROR("Unable to set alignment");
-            }
-            else if(!strcmp(parameter_name, "chunk")) {
-                const char* variable_name = mxmlElementGetAttr(node, "VariableName");
-#ifdef DEBUG
-                printf("H5Tuner: VariableName: %s\n", variable_name);
-#endif
-                /* Attempts to get dimensions from a property list? Compares variable name with file name? This looks all sorts of wrong. Will come back to this once I figure out what the deal is with the file name. Also fix C++ style declarations in middle of block -NAF */
-                if(variable_name == NULL || (variable_name != NULL && strcmp(variable_name, filename) == 0)) {
-                    int ndims = H5Sget_simple_extent_ndims(fapl_id);
-                    hsize_t *dims = (hsize_t *) malloc(sizeof(hsize_t) * ndims);
-                    H5Sget_simple_extent_dims(fapl_id, dims, NULL);
-#ifdef DEBUG
-    /* printf("dims[0] = %d, ndims = %d\n", dims[0], ndims);
-    printf("dims[1] = %d, ndims = %d\n", dims[1], ndims);
-    printf("dims[2] = %d, ndims = %d\n", dims[2], ndims); */
-#endif
 
-                    hsize_t *chunk_arr = (hsize_t *)malloc(sizeof(hsize_t) * ndims);
-                    int i;
-
-                    chunk_arr[0] = (hsize_t)strtoll(strtok(node->child->value.text.string, ","), NULL, 10);
-                    if(chunk_arr[0] > dims[0])
-                        return 0;
-#ifdef DEBUG
-    /* printf("H5Tuner: Setting chunk[0] for %s -> %d\n", filename, chunk_arr[0]); */
-#endif
-                    for(i = 1; i < ndims; i++) {
-                                        /* MSC - same is above */
-                        chunk_arr[i] = (hsize_t)strtoll(strtok(NULL, ","), NULL, 10);
-                        if(chunk_arr[i] > dims[i])
-                          return 0;
-                        #ifdef DEBUG
-                          /* printf("H5Tuner: Setting chunk[%d] for %s -> %d\n", i, filename, chunk_arr[i]); */
-                        #endif
-                    }
-
-                    /* hid_t tmp = H5Pcreate(H5P_DATASET_CREATE); */
-                    dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-                    H5Pset_chunk(dcpl_id, ndims, chunk_arr);
-
-                    return dcpl_id;
-                }
+                break;
             }
             else
-                ERROR("Unknown HDF5 parameter");
+                ERROR("Unknown FAPL parameter");
         }
     }
 
 done:
     return ret_value;
 }
+
+/* MSC - This is not tested with chunk and will no get in to chunk setting with H5Dcreate() */
+herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, const char *variable_name, hid_t space_id, hid_t dcpl_id)
+{
+    const char *node_file_name;
+    mxml_node_t *node;
+    hsize_t *dims = NULL;
+    hsize_t *chunk_arr = NULL;
+    herr_t ret_value = SUCCEED;
+
+    for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL,MXML_DESCEND);
+            node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL,MXML_DESCEND)) {
+        node_file_name = mxmlElementGetAttr(node, "FileName");
+#ifdef DEBUG
+          /* printf("Node_file_name: %s\n", node_file_name); */
+#endif
+        /* MSC - strstr() wrong usage here */
+        if(!node_file_name || strstr(filename, node_file_name))  {
+#ifdef DEBUG
+            /* printf("H5Tuner: setting %s: %s\n", parameter_name, node->child->value.text.string); */
+#endif
+            if(!strcmp(parameter_name, "chunk")) {
+                const char* node_variable_name = mxmlElementGetAttr(node, "VariableName");
+#ifdef DEBUG
+                printf("H5Tuner: VariableName: %s\n", node_variable_name);
+#endif
+                if(!node_variable_name || (!strcmp(node_variable_name, variable_name))) {
+                    char *chunk_dim_str;
+                    long long chunk_dim_ll;
+                    int ndims;
+                    int i;
+
+                    if((ndims = H5Sget_simple_extent_ndims(space_id)) < 0)
+                        ERROR("Unable to get number of space dimensions");
+                    if(NULL == (dims = (hsize_t *)malloc(sizeof(hsize_t) * ndims)))
+                        ERROR("Unable to allocate array of dimensions");
+                    if(H5Sget_simple_extent_dims(space_id, dims, NULL) < 0)
+                        ERROR("Unable to get space dimensions");
+#ifdef DEBUG
+    /* printf("dims[0] = %d, ndims = %d\n", dims[0], ndims);
+    printf("dims[1] = %d, ndims = %d\n", dims[1], ndims);
+    printf("dims[2] = %d, ndims = %d\n", dims[2], ndims); */
+#endif
+
+                    if(NULL == (chunk_arr = (hsize_t *)malloc(sizeof(hsize_t) * ndims)))
+                        ERROR("Unable to allocate array of chunk dimensions");
+
+                    if(NULL == (chunk_dim_str = strtok(node->child->value.text.string, ",")))
+                        ERROR("Unable to find chunk dimension in attribute string");
+                    chunk_dim_ll = strtoll(chunk_dim_str, NULL, 10);
+                    if(chunk_dim_ll == LLONG_MAX)
+                        ERROR("Chunk dimension overflowed");
+                    if(chunk_dim_ll <= 0)
+                        ERROR("Invalid chunk dimension");
+                    chunk_arr[0] = (hsize_t)chunk_dim_ll;
+#ifdef DEBUG
+    /* printf("H5Tuner: Setting chunk[0] for %s -> %d\n", filename, chunk_arr[0]); */
+#endif
+                    for(i = 1; i < ndims; i++) {
+                        if(NULL == (chunk_dim_str = strtok(NULL, ",")))
+                            ERROR("Unable to find chunk dimension in attribute string");
+                        chunk_dim_ll = strtoll(chunk_dim_str, NULL, 10);
+                        if(chunk_dim_ll == LLONG_MAX)
+                            ERROR("Chunk dimension overflowed");
+                        if(chunk_dim_ll <= 0)
+                            ERROR("Invalid chunk dimension");
+                        chunk_arr[i] = (hsize_t)chunk_dim_ll;
+                        #ifdef DEBUG
+                          /* printf("H5Tuner: Setting chunk[%d] for %s -> %d\n", i, filename, chunk_arr[i]); */
+                        #endif
+                    }
+
+                    H5Pset_chunk(dcpl_id, ndims, chunk_arr);
+
+                    break;
+                }
+            }
+            else
+                ERROR("Unknown DCPL parameter");
+        }
+    }
+
+done:
+    free(dims);
+    dims = NULL;
+
+    return ret_value;
+}
+
 
 FORWARD_DECL(H5Fcreate, hid_t, (const char *filename, unsigned flags, hid_t fcpl_id, hid_t fapl_id));
 FORWARD_DECL(H5Dwrite, herr_t, (hid_t dataset_id, hid_t mem_type_id, hid_t mem_space_id, hid_t file_space_id, hid_t xfer_plist_id, const void * buf));
@@ -272,9 +323,9 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
     if(set_mpi_parameter(tree, "bgl_nodes_pset", filename, &orig_info) < 0)
         ERROR("Unable to set MPI parameter \"bgl_nodes_pset\"");
 
-    if(set_hdf5_parameter(tree, "sieve_buf_size", filename, fapl_id) < 0)
+    if(set_fapl_parameter(tree, "sieve_buf_size", filename, fapl_id) < 0)
         ERROR("Unable to set FAPL parameter \"sieve_buf_size\"");
-    if(set_hdf5_parameter(tree, "alignment", filename, fapl_id) < 0)
+    if(set_fapl_parameter(tree, "alignment", filename, fapl_id) < 0)
         ERROR("Unable to set FAPL parameter \"alignment\"");
 
 #ifdef DEBUG
@@ -298,7 +349,7 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 
 done:
     if(fp && (fclose(fp) != 0))
-        ERROR("Failure closing config file");
+        DONE_ERROR("Failure closing config file");
 
     free(new_filename);
     new_filename = NULL;
@@ -327,95 +378,112 @@ herr_t DECL(H5Dwrite)(hid_t dataset_id, hid_t mem_type_id, hid_t mem_space_id, h
     return ret;
 }
 
-hid_t DECL(H5Dcreate1)(hid_t loc_id, const char *name, hid_t type_id, hid_t space_id, hid_t dcpl_id) {
-    herr_t ret = -1;
-    hid_t ret_value = -1;
-    hid_t chunked_pid;
+
+hid_t prepare_dcpl(hid_t loc_id, const char *name, hid_t space_id, hid_t dcpl_id)
+{
     FILE *fp = NULL;
     mxml_node_t *tree;
     char file_path[1024];
-
-    MAP_OR_FAIL(H5Dcreate1);
+    char *h5_filename = NULL;
+    ssize_t h5_filename_len;
+    hid_t copied_dcpl_id = -1;
+    hid_t ret_value = -1;
 
     strcpy(file_path, "config.xml");
+
+    if(NULL == (fp = fopen(file_path, "r")))
+        ERROR("Unable to open config file");
+    if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
+        ERROR("Unable to load config file");
+
+    /* Get file name */
+    if((h5_filename_len = H5Fget_name(loc_id, NULL, 0)) < 0)
+        ERROR("Unable to get HDF5 file name length");
+    if(NULL == (h5_filename = malloc((size_t)h5_filename_len + 1)))
+        ERROR("Unable to allocate HDF5 file name buffer");
+    if(H5Fget_name(loc_id, h5_filename, (size_t)h5_filename_len + 1) < 0)
+        ERROR("Unable to get HDF5 file name");
+
+    /* Set up/copy DCPL */
+    if(dcpl_id == H5P_DEFAULT) {
+        if((copied_dcpl_id = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+            ERROR("Unable to create DCPL");
+    }
+    else if((copied_dcpl_id = H5Pcopy(dcpl_id)) < 0)
+        ERROR("Unable to copy DCPL");
+
+    if(set_dcpl_parameter(tree, "chunk", h5_filename, name, space_id, copied_dcpl_id) < 0)
+        ERROR("Unable to set DCPL parameter \"chunk\"");
+
+    ret_value = copied_dcpl_id;
+
+done:
+    if(fp && (fclose(fp) != 0))
+        DONE_ERROR("Failure closing config file");
+
+    free(h5_filename);
+    h5_filename = NULL;
+
+    if((ret_value < 0) && (copied_dcpl_id >= 0) && (H5Pclose(copied_dcpl_id) < 0))
+        DONE_ERROR("Failure closing DCPL");
+    copied_dcpl_id = -1;
+
+    return ret_value;
+}
+
+
+hid_t DECL(H5Dcreate1)(hid_t loc_id, const char *name, hid_t type_id, hid_t space_id, hid_t dcpl_id) {
+    hid_t real_dcpl_id = -1;
+    hid_t ret_value = -1;
+
+    MAP_OR_FAIL(H5Dcreate1);
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: Loading parameters file for H5Dcreate1: %s\n", file_path); */
 #endif
 
-    if(NULL == (fp = fopen(file_path, "r")))
-        ERROR("Unable to open config file");
-    if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
-        ERROR("Unable to load config file");
-
-    if((chunked_pid = set_hdf5_parameter(tree, "chunk", name, space_id)) < 0)
-        ERROR("Unable to set DCPL parameter \"chunk\"");
+    /* Get real DCPL */
+    if((real_dcpl_id = prepare_dcpl(loc_id, name, space_id, dcpl_id)) < 0)
+        ERROR("Unable to obtain real DCPL");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: calling H5Dcreate1.\n"); */
   #endif
 
-    if (chunked_pid == -1) {
-            ret_value = __fake_H5Dcreate1(loc_id, name, type_id, space_id, dcpl_id);
-      }
-      else if(dcpl_id == 0) {
-            ret_value = __fake_H5Dcreate1(loc_id, name, type_id, space_id, chunked_pid);
-    }
-    else {
-            printf("H5Tuner: Cannot set chunked property list since dcpl_id is not 0!\n");
-            ret_value = __fake_H5Dcreate1(loc_id, name, type_id, space_id, dcpl_id);
-    }
+    ret_value = __fake_H5Dcreate1(loc_id, name, type_id, space_id, real_dcpl_id);
 
 done:
-    if(fp && (fclose(fp) != 0))
-        ERROR("Failure closing config file");
+    if((real_dcpl_id >= 0) && (H5Pclose(real_dcpl_id) < 0))
+        DONE_ERROR("Failure closing DCPL");
+    real_dcpl_id = -1;
 
     return ret_value;
 }
 
 hid_t DECL(H5Dcreate2)(hid_t loc_id, const char *name, hid_t dtype_id, hid_t space_id, hid_t lcpl_id, hid_t dcpl_id, hid_t dapl_id) {
-    herr_t ret = -1;
+    hid_t real_dcpl_id = -1;
     hid_t ret_value = -1;
-    hid_t chunked_pid;
-    FILE *fp = NULL;
-    mxml_node_t *tree;
-    char file_path[1024];
 
     MAP_OR_FAIL(H5Dcreate2);
-
-    strcpy(file_path, "config.xml");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: Loading parameters file for H5Dcreate2: %s\n", file_path); */
 #endif
 
-    if(NULL == (fp = fopen(file_path, "r")))
-        ERROR("Unable to open config file");
-    if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
-        ERROR("Unable to load config file");
-
-
-    if((chunked_pid = set_hdf5_parameter(tree, "chunk", name, space_id)) < 0)
-        ERROR("Unable to set DCPL parameter \"chunk\"");
+    /* Get real DCPL */
+    if((real_dcpl_id = prepare_dcpl(loc_id, name, space_id, dcpl_id)) < 0)
+        ERROR("Unable to obtain real DCPL");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: calling H5Dcreate2.\n"); */
  #endif
 
-    if (chunked_pid == -1) {
-         ret_value = __fake_H5Dcreate2(loc_id, name, dtype_id, space_id, lcpl_id, dcpl_id, dapl_id);
-    }
-    else if(dcpl_id == 0) {
-         ret_value = __fake_H5Dcreate2(loc_id, name, dtype_id, space_id, lcpl_id, dcpl_id, dapl_id);
-    }
-    else {
-      printf("H5Tuner: Cannot set chunked property list since dcpl_id is not 0.\n");
-       ret_value = __fake_H5Dcreate2(loc_id, name, dtype_id, space_id, lcpl_id, chunked_pid, dapl_id);
-    }
+    ret_value = __fake_H5Dcreate2(loc_id, name, dtype_id, space_id, lcpl_id, real_dcpl_id, dapl_id);
 
 done:
-    if(fp && (fclose(fp) != 0))
-        ERROR("Failure closing config file");
+    if((real_dcpl_id >= 0) && (H5Pclose(real_dcpl_id) < 0))
+        DONE_ERROR("Failure closing DCPL");
+    real_dcpl_id = -1;
 
     return ret_value;
 }

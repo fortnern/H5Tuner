@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <pwd.h>
 #include <assert.h>
+#include <limits.h>
 #include "mpi.h"
 #include "hdf5.h"
 #include "autotuner.h"
@@ -26,9 +27,13 @@
 /* Error macros */
 #define SUCCEED 0
 #define FAIL -1
-#define ERROR(MSG) \
+#define DONE_ERROR(MSG) \
 do { \
     fprintf(stderr, "FAILED in " __FILE__ " at line %d:\n  " MSG "\n", __LINE__); \
+} while(0)
+#define ERROR(MSG) \
+do { \
+    DONE_ERROR(MSG); \
     ret_value = FAIL; \
     goto done; \
 } while(0)
