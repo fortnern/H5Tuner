@@ -10,20 +10,10 @@
 * you may request a copy from help@hdfgroup.org.
 */
 
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include "autotuner_private.h"
 #include <libgen.h>
-#include <pwd.h>
-#include "mpi.h"
-#include "hdf5.h"
-#include "autotuner.h"
-#include "mxml.h"
-
 #define __USE_GNU
 #include <dlfcn.h>
-#include <stdlib.h>
 
 #define FORWARD_DECL(name, ret, args) \
     ret (*__fake_ ## name)args = NULL;
@@ -41,10 +31,11 @@
     }
 
 /* MSC - Needs a test */
-void set_gpfs_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, /* OUT */ char **new_filename)
+herr_t set_gpfs_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, /* OUT */ char **new_filename)
 {
     const char *node_file_name;
     mxml_node_t *node;
+    herr_t ret_value = SUCCEED;
 
     for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL, MXML_DESCEND);
             node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL, MXML_DESCEND)) {
@@ -53,31 +44,34 @@ void set_gpfs_parameter(mxml_node_t *tree, char *parameter_name, const char *fil
         /* printf("Node_file_name: %s\n", node_file_name); */
 #endif
         // TODO: Change this strstr() function call with a use of basename!
-        if((node_file_name == NULL) || (strstr(filename, node_file_name) != NULL))  {
-            if(strcmp(parameter_name, "IBM_lockless_io") == 0) {
-                if(strcmp(node->child->value.text.string, "true") == 0) {
+        if(!node_file_name || strstr(filename, node_file_name)) {
+            if(!strcmp(parameter_name, "IBM_lockless_io")) {
+                if(!strcmp(node->child->value.text.string, "true")) {
                     /* to prefix the filename with "bglockless:". */
-                    *new_filename = (char *) malloc(sizeof(char) * (strlen(filename) + sizeof("bglockless:")));
+                    if(NULL == (*new_filename = (char *)malloc(sizeof(char) * (strlen(filename) + sizeof("bglockless:")))))
+                        ERROR("Unable to allocate new filename");
 
                     strcpy(*new_filename, "bglockless:");
                     strcat(*new_filename, filename);
+
+                    break;
                 }
             }
-        }
-        else {
-            continue;
+            else
+                ERROR("Unknown GPFS parameter");
         }
     }
+
+done:
+    return ret_value;
 }
 
-/* MSC add MPI error codes */
-void set_mpi_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, MPI_Info *orig_info)
+
+herr_t set_mpi_parameter(mxml_node_t *tree, char *parameter_name, const char *filename, MPI_Info *orig_info)
 {
     const char *node_file_name;
     mxml_node_t *node;
-    int mpi_code;
-    int error = 0;
-
+    herr_t ret_value = SUCCEED;
 
     for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL,MXML_DESCEND);
             node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL,MXML_DESCEND)) {
@@ -86,27 +80,17 @@ void set_mpi_parameter(mxml_node_t *tree, char *parameter_name, const char *file
 #ifdef DEBUG
         /* printf("Node_file_name: %s\n", node_file_name); */
 #endif
-        if(node_file_name == NULL)  {
-#ifdef DEBUG
-            /* printf("H5Tuner: Execution wide setting %s: %s\n", parameter_name, node->child->value.text.string); */
-#endif
-            mpi_code = MPI_Info_set(*orig_info, parameter_name, node->child->value.text.string);
-            if(mpi_code != MPI_SUCCESS)
-                return ++error;
-        }
         /* MSC - CHECK usage of strstr().. need to switch to strcmp() probably */
-        else {
-            if( strstr(filename, node_file_name) != NULL )  {
-#ifdef DEBUG
-                /* printf("H5Tuner: %s setting %s: %s\n\n\n",node_file_name, parameter_name, node->child->value.text.string); */
-#endif
-                mpi_code = MPI_Info_set(*orig_info, parameter_name, node->child->value.text.string);
-                if(mpi_code != MPI_SUCCESS)
-                    return ++error;
-            }
-             /* continue; */
+        if(!node_file_name || strstr(filename, node_file_name)) {
+            if(MPI_Info_set(*orig_info, parameter_name, node->child->value.text.string) != MPI_SUCCESS)
+                ERROR("Failed to set MPI info");
+
+            break;
         }
     }
+
+done:
+    return ret_value;
 }
 
 /*(tree, "chunk", "D1", space_id);
@@ -119,9 +103,7 @@ hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *fi
 {
     const char *node_file_name;
     mxml_node_t *node;
-
-
-
+    herr_t ret_value = SUCCEED;
     hid_t dcpl_id=-1;
 
     for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL,MXML_DESCEND);
@@ -131,35 +113,39 @@ hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *fi
           /* printf("Node_file_name: %s\n", node_file_name); */
 #endif
         /* MSC - strstr() wrong usage here */
-        if((node_file_name == NULL) || (strstr(filename, node_file_name) != NULL))  {
+        if(!node_file_name || strstr(filename, node_file_name))  {
 #ifdef DEBUG
             /* printf("H5Tuner: setting %s: %s\n", parameter_name, node->child->value.text.string); */
 #endif
-            if(strcmp(parameter_name, "sieve_buf_size") == 0) {
-                herr_t ierr = H5Pset_sieve_buf_size(fapl_id, atoi(node->child->value.text.string));
-
+            if(!strcmp(parameter_name, "sieve_buf_size")) {
+                if(H5Pset_sieve_buf_size(fapl_id, atoi(node->child->value.text.string)) < 0)
+                    ERROR("Unable to set sieve buffer size");
             }
-            else if(strcmp(parameter_name, "alignment") == 0) {
+            else if(!strcmp(parameter_name, "alignment")) {
                 char *threshold = strtok(node->child->value.text.string, ",");
                 char *alignment = strtok(NULL, ",");
+
+                if(threshold == NULL)
+                    ERROR("Unable to read alignment threshold");
+                if(alignment == NULL)
+                    ERROR("Unable to read alignment");
+
 #ifdef DEBUG
                 /* printf("H5Tuner: setting Threshold=%s; Alignment=%s\n", threshold, alignment); */
 #endif
-
-                herr_t ierr = H5Pset_alignment(fapl_id, (hsize_t)strtoll(threshold, NULL, 10), (hsize_t)strtoll(alignment, NULL, 10));
+                if(H5Pset_alignment(fapl_id, (hsize_t)strtoll(threshold, NULL, 10), (hsize_t)strtoll(alignment, NULL, 10)) < 0)
+                    ERROR("Unable to set alignment");
             }
-            else if(strcmp(parameter_name, "chunk") == 0) {
+            else if(!strcmp(parameter_name, "chunk")) {
                 const char* variable_name = mxmlElementGetAttr(node, "VariableName");
 #ifdef DEBUG
-                 /* printf("H5Tuner: VariableName: %s\n", variable_name); */
+                printf("H5Tuner: VariableName: %s\n", variable_name);
 #endif
-
+                /* Attempts to get dimensions from a property list? Compares variable name with file name? This looks all sorts of wrong. Will come back to this once I figure out what the deal is with the file name. Also fix C++ style declarations in middle of block -NAF */
                 if(variable_name == NULL || (variable_name != NULL && strcmp(variable_name, filename) == 0)) {
-
                     int ndims = H5Sget_simple_extent_ndims(fapl_id);
                     hsize_t *dims = (hsize_t *) malloc(sizeof(hsize_t) * ndims);
                     H5Sget_simple_extent_dims(fapl_id, dims, NULL);
-
 #ifdef DEBUG
     /* printf("dims[0] = %d, ndims = %d\n", dims[0], ndims);
     printf("dims[1] = %d, ndims = %d\n", dims[1], ndims);
@@ -192,12 +178,13 @@ hid_t set_hdf5_parameter(mxml_node_t *tree, char *parameter_name, const char *fi
                     return dcpl_id;
                 }
             }
-        }
-        else {
-            continue;
+            else
+                ERROR("Unknown HDF5 parameter");
         }
     }
-    return dcpl_id;
+
+done:
+    return ret_value;
 }
 
 FORWARD_DECL(H5Fcreate, hid_t, (const char *filename, unsigned flags, hid_t fcpl_id, hid_t fapl_id));
@@ -205,19 +192,21 @@ FORWARD_DECL(H5Dwrite, herr_t, (hid_t dataset_id, hid_t mem_type_id, hid_t mem_s
 FORWARD_DECL(H5Dcreate1, hid_t, (hid_t loc_id, const char *name, hid_t type_id, hid_t space_id, hid_t dcpl_id));
 FORWARD_DECL(H5Dcreate2, hid_t, (hid_t loc_id, const char *name, hid_t dtype_id, hid_t space_id, hid_t lcpl_id, hid_t dcpl_id, hid_t dapl_id));
 
+
 hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t fapl_id)
 {
     hid_t ret_value = -1;
     herr_t ret = -1;
-    int mpi_code;
-    FILE *fp;
+    MPI_Comm orig_comm;
+    MPI_Info orig_info;
+    FILE *fp = NULL;
     mxml_node_t *tree;
     char *new_filename = NULL;
+    char file_path[1024];
+    hid_t driver;
 
     MAP_OR_FAIL(H5Fcreate);
 
-
-    char file_path[1024];
     strcpy(file_path, "config.xml");
     /* char *config_file = getenv("AT_CONFIG_FILE"); */
     /* char *file_path = config_file ; */
@@ -225,42 +214,30 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
       /* printf("\nH5Tuner: Loading parameters file: %s\n", file_path); */
   #endif
 
-    fp = fopen(file_path, "r");
-    tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK);
+    if(NULL == (fp = fopen(file_path, "r")))
+        ERROR("Unable to open config file");
+    if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
+        ERROR("Unable to load config file");
 
-    MPI_Comm orig_comm;
-    MPI_Info orig_info;
-
-    hid_t driver = H5Pget_driver(fapl_id);
+    if((driver = H5Pget_driver(fapl_id)) < 0)
+        ERROR("Unable to get file driver");
 
     if(driver == H5FD_MPIO) {
     #ifdef DEBUG
           /* printf("Driver is H5FD_MPIO\n"); */
         #endif
-        ret = H5Pget_fapl_mpio(fapl_id, &orig_comm, &orig_info);
+        if(H5Pget_fapl_mpio(fapl_id, &orig_comm, &orig_info) < 0)
+            ERROR("Unable to get MPIO file driver info");
     }
-    else {
-        fprintf(stderr, "H5Tuner Library supports mpio drivers only(). Returning...\n");
-        return ret_value;
-    }
-
-    if(ret < 0) {
-        fprintf(stderr, "Error in calling H5Pget_fapl(). Returning...\n");
-#ifdef DEBUG
-        /* printf("H5Tuner: calling H5Fcreate.\n"); */
-#endif
-
-        ret_value = __fake_H5Fcreate(filename, flags, fcpl_id, fapl_id);
-        return ret_value;
-    }
+    else
+        ERROR("H5Tuner Library supports mpio drivers only()");
 
     if(orig_info == MPI_INFO_NULL) {
 #ifdef DEBUG
           /* printf("H5Tuner: found no MPI_Info object and is creating a new one.\n"); */
 #endif
-        mpi_code = MPI_Info_create(&orig_info);
-        if(mpi_code != MPI_SUCCESS)
-            return -1;
+        if(MPI_Info_create(&orig_info) != MPI_SUCCESS)
+            ERROR("Unable to create MPI info");
     }
     else {
 
@@ -270,53 +247,58 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
     }
 
 #ifdef DEBUG
+    {
       int nkeys = -1;
-      mpi_code = MPI_Info_get_nkeys(orig_info, &nkeys);
-      if(mpi_code != MPI_SUCCESS)
-          return -1;
+      if(MPI_Info_get_nkeys(orig_info, &nkeys) != MPI_SUCCESS)
+        ERROR("Unable to get number of MPI keys");
       /* printf("H5Tuner: MPI_Info object has %d keys\n", nkeys); */
+    }
 #endif
 
-    set_gpfs_parameter(tree, "IBM_lockless_io", filename, &new_filename);
-    set_mpi_parameter(tree, "IBM_largeblock_io", filename, &orig_info);
+    if(set_gpfs_parameter(tree, "IBM_lockless_io", filename, &new_filename) < 0)
+        ERROR("Unable to set GPFS parameter \"IBM_lockless_io\"");
+    if(set_mpi_parameter(tree, "IBM_largeblock_io", filename, &orig_info) < 0)
+        ERROR("Unable to set MPI parameter \"IBM_largeblock_io\"");
 
-    set_mpi_parameter(tree, "striping_factor", filename, &orig_info);
-    set_mpi_parameter(tree, "striping_unit", filename, &orig_info);
+    if(set_mpi_parameter(tree, "striping_factor", filename, &orig_info) < 0)
+        ERROR("Unable to set MPI parameter \"striping_factor\"");
+    if(set_mpi_parameter(tree, "striping_unit", filename, &orig_info) < 0)
+        ERROR("Unable to set MPI parameter \"striping_unit\"");
 
-    set_mpi_parameter(tree, "cb_buffer_size", filename, &orig_info);
-    set_mpi_parameter(tree, "cb_nodes", filename, &orig_info);
-    set_mpi_parameter(tree, "bgl_nodes_pset", filename, &orig_info);
+    if(set_mpi_parameter(tree, "cb_buffer_size", filename, &orig_info) < 0)
+        ERROR("Unable to set MPI parameter \"cb_buffer_size\"");
+    if(set_mpi_parameter(tree, "cb_nodes", filename, &orig_info) < 0)
+        ERROR("Unable to set MPI parameter \"cb_nodes\"");
+    if(set_mpi_parameter(tree, "bgl_nodes_pset", filename, &orig_info) < 0)
+        ERROR("Unable to set MPI parameter \"bgl_nodes_pset\"");
 
-    set_hdf5_parameter(tree, "sieve_buf_size", filename, fapl_id);
-    set_hdf5_parameter(tree, "alignment", filename, fapl_id);
+    if(set_hdf5_parameter(tree, "sieve_buf_size", filename, fapl_id) < 0)
+        ERROR("Unable to set FAPL parameter \"sieve_buf_size\"");
+    if(set_hdf5_parameter(tree, "alignment", filename, fapl_id) < 0)
+        ERROR("Unable to set FAPL parameter \"alignment\"");
 
 #ifdef DEBUG
-      mpi_code = MPI_Info_get_nkeys(orig_info, &nkeys);
-      if(mpi_code != MPI_SUCCESS)
-          return -1;
-    /* printf("H5Tuner: completed parameters setting \n");
-    printf("H5Tuner created MPI_Info object has %d keys!\n", nkeys); */
+    {
+      int nkeys = -1;
+      if(MPI_Info_get_nkeys(orig_info, &nkeys) != MPI_SUCCESS)
+        ERROR("Unable to get number of MPI keys");
+      /* printf("H5Tuner: completed parameters setting \n");
+      printf("H5Tuner created MPI_Info object has %d keys!\n", nkeys); */
+    }
 #endif
 
-    if(driver == H5FD_MPIO) {
-        ret = H5Pset_fapl_mpio(fapl_id, orig_comm, orig_info);
-    }
-    else {
-        fprintf(stderr, "H5Tuner Library supports mpio drivers only(). Returning...\n");
-        return ret_value;
-    }
-
-    if(ret < 0) {
-        fprintf(stderr, "Error in calling H5Pset_fapl_mpio(). Returning...\n");
-        return ret_value;
-    }
-
-    fclose(fp);
+    assert(driver == H5FD_MPIO);
+    if(H5Pset_fapl_mpio(fapl_id, orig_comm, orig_info) < 0)
+        ERROR("Unable to set MPI file driver");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: calling H5Fcreate.\n"); */
 #endif
     ret_value = __fake_H5Fcreate(new_filename ? new_filename : filename, flags, fcpl_id, fapl_id);
+
+done:
+    if(fp && (fclose(fp) != 0))
+        ERROR("Failure closing config file");
 
     free(new_filename);
     new_filename = NULL;
@@ -348,22 +330,26 @@ herr_t DECL(H5Dwrite)(hid_t dataset_id, hid_t mem_type_id, hid_t mem_space_id, h
 hid_t DECL(H5Dcreate1)(hid_t loc_id, const char *name, hid_t type_id, hid_t space_id, hid_t dcpl_id) {
     herr_t ret = -1;
     hid_t ret_value = -1;
-    FILE *fp;
+    hid_t chunked_pid;
+    FILE *fp = NULL;
     mxml_node_t *tree;
+    char file_path[1024];
 
     MAP_OR_FAIL(H5Dcreate1);
 
-    char file_path[1024];
     strcpy(file_path, "config.xml");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: Loading parameters file for H5Dcreate1: %s\n", file_path); */
 #endif
 
-    fp = fopen(file_path, "r");
-    tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK);
+    if(NULL == (fp = fopen(file_path, "r")))
+        ERROR("Unable to open config file");
+    if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
+        ERROR("Unable to load config file");
 
-    hid_t chunked_pid = set_hdf5_parameter(tree, "chunk", name, space_id);
+    if((chunked_pid = set_hdf5_parameter(tree, "chunk", name, space_id)) < 0)
+        ERROR("Unable to set DCPL parameter \"chunk\"");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: calling H5Dcreate1.\n"); */
@@ -380,28 +366,37 @@ hid_t DECL(H5Dcreate1)(hid_t loc_id, const char *name, hid_t type_id, hid_t spac
             ret_value = __fake_H5Dcreate1(loc_id, name, type_id, space_id, dcpl_id);
     }
 
+done:
+    if(fp && (fclose(fp) != 0))
+        ERROR("Failure closing config file");
+
     return ret_value;
 }
 
 hid_t DECL(H5Dcreate2)(hid_t loc_id, const char *name, hid_t dtype_id, hid_t space_id, hid_t lcpl_id, hid_t dcpl_id, hid_t dapl_id) {
     herr_t ret = -1;
     hid_t ret_value = -1;
-    FILE *fp;
+    hid_t chunked_pid;
+    FILE *fp = NULL;
     mxml_node_t *tree;
+    char file_path[1024];
 
     MAP_OR_FAIL(H5Dcreate2);
 
-    char file_path[1024];
     strcpy(file_path, "config.xml");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: Loading parameters file for H5Dcreate2: %s\n", file_path); */
 #endif
 
-    fp = fopen(file_path, "r");
-    tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK);
+    if(NULL == (fp = fopen(file_path, "r")))
+        ERROR("Unable to open config file");
+    if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
+        ERROR("Unable to load config file");
 
-    hid_t chunked_pid = set_hdf5_parameter(tree, "chunk", name, space_id);
+
+    if((chunked_pid = set_hdf5_parameter(tree, "chunk", name, space_id)) < 0)
+        ERROR("Unable to set DCPL parameter \"chunk\"");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: calling H5Dcreate2.\n"); */
@@ -418,6 +413,10 @@ hid_t DECL(H5Dcreate2)(hid_t loc_id, const char *name, hid_t dtype_id, hid_t spa
        ret_value = __fake_H5Dcreate2(loc_id, name, dtype_id, space_id, lcpl_id, chunked_pid, dapl_id);
     }
 
-    return ret_value;
+done:
+    if(fp && (fclose(fp) != 0))
+        ERROR("Failure closing config file");
 
+    return ret_value;
 }
+

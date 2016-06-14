@@ -49,7 +49,7 @@
 /* Define some handy debugging shorthands, routines, ... */
 /* debugging tools */
 #define MESG(x)\
-	if (verbose) printf("%s\n", x);\
+    if (verbose) printf("%s\n", x);\
 
 #define MPI_BANNER(mesg)\
     {printf("--------------------------------\n");\
@@ -66,34 +66,34 @@
 #define SPACE1_DIM1	24
 #define SPACE1_DIM2	24
 #define SPACE1_RANK	2
-#define DATASETNAME1	"Data1"
-#define DATASETNAME2	"Data2"
-#define DATASETNAME3	"Data3"
+#define DATASETNAME1    "Data1"
+#define DATASETNAME2    "Data2"
+#define DATASETNAME3    "Data3"
 /* hyperslab layout styles */
-#define BYROW		1	/* divide into slabs of rows */
-#define BYCOL		2	/* divide into blocks of columns */
+#define BYROW           1       /* divide into slabs of rows */
+#define BYCOL           2       /* divide into blocks of columns */
 
-#define PARAPREFIX	"HDF5_PARAPREFIX"	/* file prefix environment variable name */
+#define PARAPREFIX	"HDF5_PARAPREFIX"   /* file prefix environment variable name */
 
 
 /* dataset data type.  Int's can be easily octo dumped. */
 typedef int DATATYPE;
 
 /* global variables */
-int nerrors = 0;				/* errors count */
+int nerrors = 0;                        /* errors count */
 #ifndef PATH_MAX
 #define PATH_MAX    512
 #endif  /* !PATH_MAX */
 char    testfiles[2][PATH_MAX];
 
 
-int mpi_size, mpi_rank;				/* mpi variables */
+int mpi_size, mpi_rank;                 /* mpi variables */
 
 /* option flags */
-int verbose = 0;			/* verbose, default as no. */
-int doread=1;				/* read test */
-int dowrite=1;				/* write test */
-int docleanup=1;			/* cleanup */
+int verbose = 0;                        /* verbose, default as no. */
+int doread=1;                           /* read test */
+int dowrite=1;                          /* write test */
+int docleanup=1;                        /* cleanup */
 
 /* Prototypes */
 void slab_set(hsize_t start[], hsize_t count[], hsize_t stride[], int mode);
@@ -121,33 +121,33 @@ slab_set(hsize_t start[], hsize_t count[], hsize_t stride[], int mode)
 {
     switch (mode){
     case BYROW:
-	/* Each process takes a slabs of rows. */
-	stride[0] = 1;
-	stride[1] = 1;
-	count[0] = SPACE1_DIM1/mpi_size;
-	count[1] = SPACE1_DIM2;
-	start[0] = mpi_rank*count[0];
-	start[1] = 0;
-	break;
-    case BYCOL:
-	/* Each process takes a block of columns. */
-	stride[0] = 1;
-	stride[1] = 1;
-	count[0] = SPACE1_DIM1;
-	count[1] = SPACE1_DIM2/mpi_size;
-	start[0] = 0;
-	start[1] = mpi_rank*count[1];
-	break;
-    default:
-	/* Unknown mode.  Set it to cover the whole dataset. */
-	printf("unknown slab_set mode (%d)\n", mode);
-	stride[0] = 1;
-	stride[1] = 1;
-	count[0] = SPACE1_DIM1;
-	count[1] = SPACE1_DIM2;
-	start[0] = 0;
-	start[1] = 0;
-	break;
+        /* Each process takes a slabs of rows. */
+        stride[0] = 1;
+        stride[1] = 1;
+        count[0] = SPACE1_DIM1/mpi_size;
+        count[1] = SPACE1_DIM2;
+        start[0] = mpi_rank*count[0];
+        start[1] = 0;
+        break;
+        case BYCOL:
+        /* Each process takes a block of columns. */
+        stride[0] = 1;
+        stride[1] = 1;
+        count[0] = SPACE1_DIM1;
+        count[1] = SPACE1_DIM2/mpi_size;
+        start[0] = 0;
+        start[1] = mpi_rank*count[1];
+        break;
+        default:
+        /* Unknown mode.  Set it to cover the whole dataset. */
+        printf("unknown slab_set mode (%d)\n", mode);
+        stride[0] = 1;
+        stride[1] = 1;
+        count[0] = SPACE1_DIM1;
+        count[1] = SPACE1_DIM2;
+        start[0] = 0;
+        start[1] = 0;
+        break;
     }
 }
 
@@ -164,9 +164,9 @@ dataset_fill(hsize_t start[], hsize_t count[], hsize_t stride[], DATATYPE * data
 
     /* put some trivial data in the data_array */
     for (i=0; i < count[0]; i++){
-	for (j=0; j < count[1]; j++){
-	    *dataptr++ = (i*stride[0]+start[0])*100 + (j*stride[1]+start[1]+1);
-	}
+        for (j=0; j < count[1]; j++){
+            *dataptr++ = (i*stride[0]+start[0])*100 + (j*stride[1]+start[1]+1);
+        }
     }
 }
 
@@ -181,11 +181,11 @@ void dataset_print(hsize_t start[], hsize_t count[], hsize_t stride[], DATATYPE 
 
     /* print the slab read */
     for (i=0; i < count[0]; i++){
-	printf("Row %lu: ", (unsigned long)(i*stride[0]+start[0]));
-	for (j=0; j < count[1]; j++){
-	    printf("%03d ", *dataptr++);
-	}
-	printf("\n");
+        printf("Row %lu: ", (unsigned long)(i*stride[0]+start[0]));
+        for (j=0; j < count[1]; j++){
+            printf("%03d ", *dataptr++);
+        }
+        printf("\n");
     }
 }
 
@@ -202,26 +202,26 @@ int dataset_vrfy(hsize_t start[], hsize_t count[], hsize_t stride[], DATATYPE *d
 
     /* print it if verbose */
     if (verbose)
-	dataset_print(start, count, stride, dataset);
+        dataset_print(start, count, stride, dataset);
 
     nerr = 0;
     for (i=0; i < count[0]; i++){
-	for (j=0; j < count[1]; j++){
-	    if (*dataset++ != *original++){
-		nerr++;
-		if (nerr <= MAX_ERR_REPORT){
-		    printf("Dataset Verify failed at [%lu][%lu](row %lu, col %lu): expect %d, got %d\n",
-			(unsigned long)i, (unsigned long)j,
-			(unsigned long)(i*stride[0]+start[0]), (unsigned long)(j*stride[1]+start[1]),
-			*(dataset-1), *(original-1));
-		}
-	    }
-	}
+        for (j=0; j < count[1]; j++){
+            if (*dataset++ != *original++){
+                nerr++;
+                if (nerr <= MAX_ERR_REPORT){
+                    printf("Dataset Verify failed at [%lu][%lu](row %lu, col %lu): expect %d, got %d\n",
+                        (unsigned long)i, (unsigned long)j,
+                        (unsigned long)(i*stride[0]+start[0]), (unsigned long)(j*stride[1]+start[1]),
+                        *(dataset-1), *(original-1));
+                }
+            }
+        }
     }
     if (nerr > MAX_ERR_REPORT)
-	printf("[more errors ...]\n");
+        printf("[more errors ...]\n");
     if (nerr)
-	printf("%d errors found in dataset_vrfy\n", nerr);
+        printf("%d errors found in dataset_vrfy\n", nerr);
     return(nerr);
 }
 
@@ -244,7 +244,7 @@ phdf5writeInd(char *filename)
     hid_t mem_dataspace;	/* memory dataspace ID */
     hid_t dataset1, dataset2;	/* Dataset ID */
     hsize_t dims1[SPACE1_RANK] =
-	{SPACE1_DIM1,SPACE1_DIM2};	/* dataspace dim sizes */
+        {SPACE1_DIM1,SPACE1_DIM2};	/* dataspace dim sizes */
     DATATYPE data_array1[SPACE1_DIM1][SPACE1_DIM2];	/* data buffer */
 
     hsize_t start[SPACE1_RANK];			/* for hyperslab setting */
@@ -256,7 +256,7 @@ phdf5writeInd(char *filename)
     MPI_Info info = MPI_INFO_NULL;
 
     if (verbose)
-	printf("Independent write test on file %s\n", filename);
+        printf("Independent write test on file %s\n", filename);
 
     /* -------------------
      * START AN HDF5 FILE
@@ -293,13 +293,13 @@ phdf5writeInd(char *filename)
 
     /* create a dataset collectively */
     dataset1 = H5Dcreate2(fid1, DATASETNAME1, H5T_NATIVE_INT, sid1,
-			H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     assert(dataset1 != FAIL);
     MESG("H5Dcreate2 succeed");
 
     /* create another dataset collectively */
     dataset2 = H5Dcreate2(fid1, DATASETNAME2, H5T_NATIVE_INT, sid1,
-			H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     assert(dataset2 != FAIL);
     MESG("H5Dcreate2 succeed");
 
@@ -312,11 +312,11 @@ phdf5writeInd(char *filename)
     count[1] = SPACE1_DIM2;
     stride[0] = 1;
     stride[1] =1;
-if (verbose)
-    printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
-	(unsigned long)start[0], (unsigned long)start[1],
-        (unsigned long)count[0], (unsigned long)count[1],
-        (unsigned long)(count[0]*count[1]));
+    if (verbose)
+        printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
+                (unsigned long)start[0], (unsigned long)start[1],
+                (unsigned long)count[0], (unsigned long)count[1],
+                (unsigned long)(count[0]*count[1]));
 
     /* put some trivial data in the data_array */
     dataset_fill(start, count, stride, &data_array1[0][0]);
@@ -327,7 +327,7 @@ if (verbose)
     assert(file_dataspace != FAIL);
     MESG("H5Dget_space succeed");
     ret=H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, start, stride,
-	    count, NULL);
+            count, NULL);
     assert(ret != FAIL);
     MESG("H5Sset_hyperslab succeed");
 
@@ -337,13 +337,13 @@ if (verbose)
 
     /* write data independently */
     ret = H5Dwrite(dataset1, H5T_NATIVE_INT, mem_dataspace, file_dataspace,
-	    H5P_DEFAULT, data_array1);
+            H5P_DEFAULT, data_array1);
     assert(ret != FAIL);
     MESG("H5Dwrite succeed");
 
     /* write data independently */
     ret = H5Dwrite(dataset2, H5T_NATIVE_INT, mem_dataspace, file_dataspace,
-	    H5P_DEFAULT, data_array1);
+            H5P_DEFAULT, data_array1);
     assert(ret != FAIL);
     MESG("H5Dwrite succeed");
 
@@ -420,17 +420,17 @@ phdf5readInd(char *filename)
     count[1] = SPACE1_DIM2;
     stride[0] = 1;
     stride[1] =1;
-if (verbose)
-    printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
-        (unsigned long)start[0], (unsigned long)start[1],
-        (unsigned long)count[0], (unsigned long)count[1],
-        (unsigned long)(count[0]*count[1]));
+    if (verbose)
+        printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
+                (unsigned long)start[0], (unsigned long)start[1],
+                (unsigned long)count[0], (unsigned long)count[1],
+                (unsigned long)(count[0]*count[1]));
 
     /* create a file dataspace independently */
     file_dataspace = H5Dget_space (dataset1);
     assert(file_dataspace != FAIL);
     ret=H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, start, stride,
-	    count, NULL);
+            count, NULL);
     assert(ret != FAIL);
 
     /* create a memory dataspace independently */
@@ -442,7 +442,7 @@ if (verbose)
 
     /* read data independently */
     ret = H5Dread(dataset1, H5T_NATIVE_INT, mem_dataspace, file_dataspace,
-	    H5P_DEFAULT, data_array1);
+            H5P_DEFAULT, data_array1);
     assert(ret != FAIL);
 
     /* verify the read data with original expected data */
@@ -451,7 +451,7 @@ if (verbose)
 
     /* read data independently */
     ret = H5Dread(dataset2, H5T_NATIVE_INT, mem_dataspace, file_dataspace,
-	    H5P_DEFAULT, data_array1);
+            H5P_DEFAULT, data_array1);
     assert(ret != FAIL);
 
     /* verify the read data with original expected data */
@@ -492,7 +492,7 @@ phdf5writeAll(char *filename)
     hid_t mem_dataspace;	/* memory dataspace ID */
     hid_t dataset1, dataset2;	/* Dataset ID */
     hsize_t dims1[SPACE1_RANK] =
-	{SPACE1_DIM1,SPACE1_DIM2};	/* dataspace dim sizes */
+        {SPACE1_DIM1,SPACE1_DIM2};	/* dataspace dim sizes */
     DATATYPE data_array1[SPACE1_DIM1][SPACE1_DIM2];	/* data buffer */
 
     hsize_t start[SPACE1_RANK];			/* for hyperslab setting */
@@ -504,7 +504,7 @@ phdf5writeAll(char *filename)
     MPI_Info info = MPI_INFO_NULL;
 
     if (verbose)
-	printf("Collective write test on file %s\n", filename);
+        printf("Collective write test on file %s\n", filename);
 
     /* -------------------
      * START AN HDF5 FILE
@@ -554,18 +554,18 @@ phdf5writeAll(char *filename)
 
     /* Dataset1: each process takes a block of rows. */
     slab_set(start, count, stride, BYROW);
-if (verbose)
-    printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
-	(unsigned long)start[0], (unsigned long)start[1],
-        (unsigned long)count[0], (unsigned long)count[1],
-        (unsigned long)(count[0]*count[1]));
+    if (verbose)
+        printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
+                (unsigned long)start[0], (unsigned long)start[1],
+                (unsigned long)count[0], (unsigned long)count[1],
+                (unsigned long)(count[0]*count[1]));
 
     /* create a file dataspace independently */
     file_dataspace = H5Dget_space (dataset1);
     assert(file_dataspace != FAIL);
     MESG("H5Dget_space succeed");
     ret=H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, start, stride,
-	    count, NULL);
+            count, NULL);
     assert(ret != FAIL);
     MESG("H5Sset_hyperslab succeed");
 
@@ -577,8 +577,8 @@ if (verbose)
     dataset_fill(start, count, stride, &data_array1[0][0]);
     MESG("data_array initialized");
     if (verbose){
-	MESG("data_array created");
-	dataset_print(start, count, stride, &data_array1[0][0]);
+        MESG("data_array created");
+        dataset_print(start, count, stride, &data_array1[0][0]);
     }
 
     /* set up the collective transfer properties list */
@@ -590,7 +590,7 @@ if (verbose)
 
     /* write data collectively */
     ret = H5Dwrite(dataset1, H5T_NATIVE_INT, mem_dataspace, file_dataspace,
-	    xfer_plist, data_array1);
+            xfer_plist, data_array1);
     assert(ret != FAIL);
     MESG("H5Dwrite succeed");
 
@@ -603,18 +603,18 @@ if (verbose)
 
     /* Dataset2: each process takes a block of columns. */
     slab_set(start, count, stride, BYCOL);
-if (verbose)
-    printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
-	(unsigned long)start[0], (unsigned long)start[1],
-        (unsigned long)count[0], (unsigned long)count[1],
-        (unsigned long)(count[0]*count[1]));
+    if (verbose)
+        printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
+                (unsigned long)start[0], (unsigned long)start[1],
+                (unsigned long)count[0], (unsigned long)count[1],
+                (unsigned long)(count[0]*count[1]));
 
     /* put some trivial data in the data_array */
     dataset_fill(start, count, stride, &data_array1[0][0]);
     MESG("data_array initialized");
     if (verbose){
-	MESG("data_array created");
-	dataset_print(start, count, stride, &data_array1[0][0]);
+        MESG("data_array created");
+        dataset_print(start, count, stride, &data_array1[0][0]);
     }
 
     /* create a file dataspace independently */
@@ -622,7 +622,7 @@ if (verbose)
     assert(file_dataspace != FAIL);
     MESG("H5Dget_space succeed");
     ret=H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, start, stride,
-	    count, NULL);
+            count, NULL);
     assert(ret != FAIL);
     MESG("H5Sset_hyperslab succeed");
 
@@ -634,8 +634,8 @@ if (verbose)
     dataset_fill(start, count, stride, &data_array1[0][0]);
     MESG("data_array initialized");
     if (verbose){
-	MESG("data_array created");
-	dataset_print(start, count, stride, &data_array1[0][0]);
+        MESG("data_array created");
+        dataset_print(start, count, stride, &data_array1[0][0]);
     }
 
     /* set up the collective transfer properties list */
@@ -647,7 +647,7 @@ if (verbose)
 
     /* write data independently */
     ret = H5Dwrite(dataset2, H5T_NATIVE_INT, mem_dataspace, file_dataspace,
-	    xfer_plist, data_array1);
+            xfer_plist, data_array1);
     assert(ret != FAIL);
     MESG("H5Dwrite succeed");
 
@@ -749,7 +749,7 @@ phdf5readAll(char *filename)
     slab_set(start, count, stride, BYCOL);
 if (verbose)
     printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
-	(unsigned long)start[0], (unsigned long)start[1],
+        (unsigned long)start[0], (unsigned long)start[1],
         (unsigned long)count[0], (unsigned long)count[1],
         (unsigned long)(count[0]*count[1]));
 
@@ -758,7 +758,7 @@ if (verbose)
     assert(file_dataspace != FAIL);
     MESG("H5Dget_space succeed");
     ret=H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, start, stride,
-	    count, NULL);
+            count, NULL);
     assert(ret != FAIL);
     MESG("H5Sset_hyperslab succeed");
 
@@ -770,8 +770,8 @@ if (verbose)
     dataset_fill(start, count, stride, &data_origin1[0][0]);
     MESG("data_array initialized");
     if (verbose){
-	MESG("data_array created");
-	dataset_print(start, count, stride, &data_array1[0][0]);
+        MESG("data_array created");
+        dataset_print(start, count, stride, &data_array1[0][0]);
     }
 
     /* set up the collective transfer properties list */
@@ -783,7 +783,7 @@ if (verbose)
 
     /* read data collectively */
     ret = H5Dread(dataset1, H5T_NATIVE_INT, mem_dataspace, file_dataspace,
-	    xfer_plist, data_array1);
+            xfer_plist, data_array1);
     assert(ret != FAIL);
     MESG("H5Dread succeed");
 
@@ -802,7 +802,7 @@ if (verbose)
     slab_set(start, count, stride, BYROW);
 if (verbose)
     printf("start[]=(%lu,%lu), count[]=(%lu,%lu), total datapoints=%lu\n",
-	(unsigned long)start[0], (unsigned long)start[1],
+        (unsigned long)start[0], (unsigned long)start[1],
         (unsigned long)count[0], (unsigned long)count[1],
         (unsigned long)(count[0]*count[1]));
 
@@ -811,7 +811,7 @@ if (verbose)
     assert(file_dataspace != FAIL);
     MESG("H5Dget_space succeed");
     ret=H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, start, stride,
-	    count, NULL);
+            count, NULL);
     assert(ret != FAIL);
     MESG("H5Sset_hyperslab succeed");
 
@@ -823,8 +823,8 @@ if (verbose)
     dataset_fill(start, count, stride, &data_origin1[0][0]);
     MESG("data_array initialized");
     if (verbose){
-	MESG("data_array created");
-	dataset_print(start, count, stride, &data_array1[0][0]);
+        MESG("data_array created");
+        dataset_print(start, count, stride, &data_array1[0][0]);
     }
 
     /* set up the collective transfer properties list */
@@ -836,7 +836,7 @@ if (verbose)
 
     /* read data independently */
     ret = H5Dread(dataset2, H5T_NATIVE_INT, mem_dataspace, file_dataspace,
-	    xfer_plist, data_array1);
+            xfer_plist, data_array1);
     assert(ret != FAIL);
     MESG("H5Dread succeed");
 
@@ -887,8 +887,8 @@ test_split_comm_access(char filenames[][PATH_MAX])
     herr_t ret;			/* generic return value */
 
     if (verbose)
-	printf("Independent write test on file %s %s\n",
-	    filenames[0], filenames[1]);
+        printf("Independent write test on file %s %s\n",
+                filenames[0], filenames[1]);
 
     color = mpi_rank%2;
     mrc = MPI_Comm_split (MPI_COMM_WORLD, color, mpi_rank, &comm);
@@ -897,34 +897,34 @@ test_split_comm_access(char filenames[][PATH_MAX])
     MPI_Comm_rank(comm,&newrank);
 
     if (color){
-	/* odd-rank processes */
-	mrc = MPI_Barrier(comm);
-	assert(mrc==MPI_SUCCESS);
+        /* odd-rank processes */
+        mrc = MPI_Barrier(comm);
+        assert(mrc==MPI_SUCCESS);
     }else{
-	/* even-rank processes */
-	/* setup file access template */
-	acc_tpl = H5Pcreate (H5P_FILE_ACCESS);
-	assert(acc_tpl != FAIL);
+        /* even-rank processes */
+        /* setup file access template */
+        acc_tpl = H5Pcreate (H5P_FILE_ACCESS);
+        assert(acc_tpl != FAIL);
 
-	/* set Parallel access with communicator */
-	ret = H5Pset_fapl_mpio(acc_tpl, comm, info);
-	assert(ret != FAIL);
+        /* set Parallel access with communicator */
+        ret = H5Pset_fapl_mpio(acc_tpl, comm, info);
+        assert(ret != FAIL);
 
-	/* create the file collectively */
-	fid=H5Fcreate(filenames[color],H5F_ACC_TRUNC,H5P_DEFAULT,acc_tpl);
-	assert(fid != FAIL);
-	MESG("H5Fcreate succeed");
-	
-	/* Release file-access template */
-	ret=H5Pclose(acc_tpl);
-	assert(ret != FAIL);
+        /* create the file collectively */
+        fid=H5Fcreate(filenames[color],H5F_ACC_TRUNC,H5P_DEFAULT,acc_tpl);
+        assert(fid != FAIL);
+        MESG("H5Fcreate succeed");
 
-	ret=H5Fclose(fid);
-	assert(ret != FAIL);
+        /* Release file-access template */
+        ret=H5Pclose(acc_tpl);
+        assert(ret != FAIL);
+
+        ret=H5Fclose(fid);
+        assert(ret != FAIL);
     }
     if (mpi_rank == 0){
-	mrc = MPI_File_delete(filenames[color], info);
-	assert(mrc==MPI_SUCCESS);
+        mrc = MPI_File_delete(filenames[color], info);
+        assert(mrc==MPI_SUCCESS);
     }
 }
 
@@ -964,16 +964,16 @@ mkfilenames(char *prefix)
     /* and the terminating null. */
     strsize = strlen(prefix) + 12;
     if (strsize > PATH_MAX){
-	printf("File prefix too long;  Use a short path name.\n");
-	return(1);
+        printf("File prefix too long;  Use a short path name.\n");
+        return(1);
     }
     n = sizeof(testfiles)/sizeof(testfiles[0]);
     if (n > 9){
-	printf("Warning: Too many entries in testfiles. "
-	    "Need to adjust the code to accommodate the large size.\n");
+        printf("Warning: Too many entries in testfiles. "
+                "Need to adjust the code to accommodate the large size.\n");
     }
     for (i=0; i<n; i++){
-	sprintf(testfiles[i], "%s/ParaEg%d.h5", prefix, i);
+        sprintf(testfiles[i], "%s/ParaEg%d.h5", prefix, i);
     }
     return(0);
 
@@ -989,50 +989,50 @@ parse_options(int argc, char **argv){
 
     /* initialize testfiles to nulls */
     n = sizeof(testfiles)/sizeof(testfiles[0]);
-    for (i=0; i<n; i++){
-	testfiles[i][0] = '\0';
+    for(i=0; i<n; i++) {
+        testfiles[i][0] = '\0';
     }
 
-    while (--argc){
-	if (**(++argv) != '-'){
-	    break;
-	}else{
-	    switch(*(*argv+1)){
-		case 'f':   ++argv;
-			    if (--argc < 1){
-				usage();
-				nerrors++;
-				return(1);
-			    }
-			    if (mkfilenames(*argv)){
-				nerrors++;
-				return(1);
-			    }
-			    break;
-		case 'c':   docleanup = 0;	/* no cleanup */
-			    break;
-		case 'r':   doread = 0;
-			    break;
-		case 'w':   dowrite = 0;
-			    break;
-		case 'v':   verbose = 1;
-			    break;
-		default:    usage();
-			    nerrors++;
-			    return(1);
-	    }
-	}
+    while(--argc) {
+        if (**(++argv) != '-'){
+            break;
+        }else{
+            switch(*(*argv+1)){
+                case 'f':   ++argv;
+                    if (--argc < 1){
+                        usage();
+                        nerrors++;
+                        return(1);
+                    }
+                    if (mkfilenames(*argv)){
+                        nerrors++;
+                        return(1);
+                    }
+                    break;
+                case 'c':   docleanup = 0;	/* no cleanup */
+                    break;
+                case 'r':   doread = 0;
+                    break;
+                case 'w':   dowrite = 0;
+                    break;
+                case 'v':   verbose = 1;
+                    break;
+                default:    usage();
+                    nerrors++;
+                    return(1);
+            }
+        }
     }
 
     /* check the file prefix */
     if (testfiles[0][0] == '\0'){
-	/* try get it from environment variable HDF5_PARAPREFIX */
-	char *env;
-	char *env_default = ".";	/* default to current directory */
-	if ((env=getenv(PARAPREFIX))==NULL){
-	    env = env_default;
-	}
-	mkfilenames(env);
+        /* try get it from environment variable HDF5_PARAPREFIX */
+        char *env;
+        char *env_default = ".";	/* default to current directory */
+        if ((env=getenv(PARAPREFIX))==NULL){
+            env = env_default;
+        }
+        mkfilenames(env);
     }
     return(0);
 }
@@ -1048,7 +1048,7 @@ cleanup(void)
 
     n = sizeof(testfiles)/sizeof(testfiles[0]);
     for (i=0; i<n; i++){
-	MPI_File_delete(testfiles[i], MPI_INFO_NULL);
+        MPI_File_delete(testfiles[i], MPI_INFO_NULL);
     }
 }
 
@@ -1067,56 +1067,56 @@ main(int argc, char **argv)
     MPI_Get_processor_name(mpi_name,&mpi_namelen);
     /* Make sure datasets can be divided into equal chunks by the processes */
     if ((SPACE1_DIM1 % mpi_size) || (SPACE1_DIM2 % mpi_size)){
-	printf("DIM1(%d) and DIM2(%d) must be multiples of processes (%d)\n",
-	    SPACE1_DIM1, SPACE1_DIM2, mpi_size);
-	nerrors++;
-	goto finish;
+        printf("DIM1(%d) and DIM2(%d) must be multiples of processes (%d)\n",
+                SPACE1_DIM1, SPACE1_DIM2, mpi_size);
+        nerrors++;
+        goto finish;
     }
 
     if (parse_options(argc, argv) != 0)
-	goto finish;
+        goto finish;
 
     /* show test file names */
     if (mpi_rank == 0){
-	n = sizeof(testfiles)/sizeof(testfiles[0]);
-	printf("Parallel test files are:\n");
-	for (i=0; i<n; i++){
-	    printf("   %s\n", testfiles[i]);
-	}
+        n = sizeof(testfiles)/sizeof(testfiles[0]);
+        printf("Parallel test files are:\n");
+        for (i=0; i<n; i++){
+            printf("   %s\n", testfiles[i]);
+        }
     }
 
     if (dowrite){
-	MPI_BANNER("testing PHDF5 dataset using split communicators...");
-	test_split_comm_access(testfiles);
-	MPI_BANNER("testing PHDF5 dataset independent write...");
-	phdf5writeInd(testfiles[0]);
-	MPI_BANNER("testing PHDF5 dataset collective write...");
-	phdf5writeAll(testfiles[1]);
+        MPI_BANNER("testing PHDF5 dataset using split communicators...");
+        test_split_comm_access(testfiles);
+        MPI_BANNER("testing PHDF5 dataset independent write...");
+        phdf5writeInd(testfiles[0]);
+        MPI_BANNER("testing PHDF5 dataset collective write...");
+        phdf5writeAll(testfiles[1]);
     }
     if (doread){
-	MPI_BANNER("testing PHDF5 dataset independent read...");
-	phdf5readInd(testfiles[0]);
-	MPI_BANNER("testing PHDF5 dataset collective read...");
-	phdf5readAll(testfiles[1]);
+        MPI_BANNER("testing PHDF5 dataset independent read...");
+        phdf5readInd(testfiles[0]);
+        MPI_BANNER("testing PHDF5 dataset collective read...");
+        phdf5readAll(testfiles[1]);
     }
 
     if (!(dowrite || doread)){
-	usage();
-	nerrors++;
+        usage();
+        nerrors++;
     }
 
 finish:
     if (mpi_rank == 0){		/* only process 0 reports */
-	if (nerrors)
-	    printf("***PHDF5 tests detected %d errors***\n", nerrors);
-	else{
-	    printf("===================================\n");
-	    printf("PHDF5 tests finished with no errors\n");
-	    printf("===================================\n");
-	}
+        if (nerrors)
+            printf("***PHDF5 tests detected %d errors***\n", nerrors);
+        else{
+            printf("===================================\n");
+            printf("PHDF5 tests finished with no errors\n");
+            printf("===================================\n");
+        }
     }
     if (docleanup)
-	cleanup();
+        cleanup();
     MPI_Finalize();
 
     return(nerrors);
@@ -1127,7 +1127,8 @@ finish:
 int
 main(void)
 {
-printf("No PHDF5 example because parallel is not configured in\n");
-return(0);
+    printf("No PHDF5 example because parallel is not configured in\n");
+    return(0);
 }
 #endif /* H5_HAVE_PARALLEL */
+

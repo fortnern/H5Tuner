@@ -9,14 +9,7 @@
 * you may request a copy from help@hdfgroup.org.
 */
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <pwd.h>
-#include "mpi.h"
-#include "hdf5.h"
-#include "autotuner.h"
-#include "mxml.h"
+#include "autotuner_private.h"
 
 /*
 typedef int hid_t;
