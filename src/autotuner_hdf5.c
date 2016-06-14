@@ -248,12 +248,13 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 {
     hid_t ret_value = -1;
     herr_t ret = -1;
-    MPI_Comm orig_comm;
-    MPI_Info orig_info;
+    MPI_Comm new_comm = MPI_COMM_NULL;
+    MPI_Info new_info = MPI_INFO_NULL;
     FILE *fp = NULL;
     mxml_node_t *tree;
     char *new_filename = NULL;
     char file_path[1024];
+    hid_t real_fapl_id = -1;
     hid_t driver;
 
     MAP_OR_FAIL(H5Fcreate);
@@ -270,24 +271,32 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
     if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
         ERROR("Unable to load config file");
 
-    if((driver = H5Pget_driver(fapl_id)) < 0)
+    /* Set up/copy FAPL */
+    if(fapl_id == H5P_DEFAULT) {
+        if((real_fapl_id = H5Pcreate(H5P_FILE_ACCESS)) < 0)
+            ERROR("Unable to create FAPL");
+    }
+    else if((real_fapl_id = H5Pcopy(fapl_id)) < 0)
+        ERROR("Unable to copy FAPL");
+
+    if((driver = H5Pget_driver(real_fapl_id)) < 0)
         ERROR("Unable to get file driver");
 
     if(driver == H5FD_MPIO) {
     #ifdef DEBUG
           /* printf("Driver is H5FD_MPIO\n"); */
         #endif
-        if(H5Pget_fapl_mpio(fapl_id, &orig_comm, &orig_info) < 0)
+        if(H5Pget_fapl_mpio(real_fapl_id, &new_comm, &new_info) < 0)
             ERROR("Unable to get MPIO file driver info");
     }
     else
         ERROR("H5Tuner Library supports mpio drivers only()");
 
-    if(orig_info == MPI_INFO_NULL) {
+    if(new_info == MPI_INFO_NULL) {
 #ifdef DEBUG
           /* printf("H5Tuner: found no MPI_Info object and is creating a new one.\n"); */
 #endif
-        if(MPI_Info_create(&orig_info) != MPI_SUCCESS)
+        if(MPI_Info_create(&new_info) != MPI_SUCCESS)
             ERROR("Unable to create MPI info");
     }
     else {
@@ -300,7 +309,7 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 #ifdef DEBUG
     {
       int nkeys = -1;
-      if(MPI_Info_get_nkeys(orig_info, &nkeys) != MPI_SUCCESS)
+      if(MPI_Info_get_nkeys(new_info, &nkeys) != MPI_SUCCESS)
         ERROR("Unable to get number of MPI keys");
       /* printf("H5Tuner: MPI_Info object has %d keys\n", nkeys); */
     }
@@ -308,30 +317,30 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 
     if(set_gpfs_parameter(tree, "IBM_lockless_io", filename, &new_filename) < 0)
         ERROR("Unable to set GPFS parameter \"IBM_lockless_io\"");
-    if(set_mpi_parameter(tree, "IBM_largeblock_io", filename, &orig_info) < 0)
+    if(set_mpi_parameter(tree, "IBM_largeblock_io", filename, &new_info) < 0)
         ERROR("Unable to set MPI parameter \"IBM_largeblock_io\"");
 
-    if(set_mpi_parameter(tree, "striping_factor", filename, &orig_info) < 0)
+    if(set_mpi_parameter(tree, "striping_factor", filename, &new_info) < 0)
         ERROR("Unable to set MPI parameter \"striping_factor\"");
-    if(set_mpi_parameter(tree, "striping_unit", filename, &orig_info) < 0)
+    if(set_mpi_parameter(tree, "striping_unit", filename, &new_info) < 0)
         ERROR("Unable to set MPI parameter \"striping_unit\"");
 
-    if(set_mpi_parameter(tree, "cb_buffer_size", filename, &orig_info) < 0)
+    if(set_mpi_parameter(tree, "cb_buffer_size", filename, &new_info) < 0)
         ERROR("Unable to set MPI parameter \"cb_buffer_size\"");
-    if(set_mpi_parameter(tree, "cb_nodes", filename, &orig_info) < 0)
+    if(set_mpi_parameter(tree, "cb_nodes", filename, &new_info) < 0)
         ERROR("Unable to set MPI parameter \"cb_nodes\"");
-    if(set_mpi_parameter(tree, "bgl_nodes_pset", filename, &orig_info) < 0)
+    if(set_mpi_parameter(tree, "bgl_nodes_pset", filename, &new_info) < 0)
         ERROR("Unable to set MPI parameter \"bgl_nodes_pset\"");
 
-    if(set_fapl_parameter(tree, "sieve_buf_size", filename, fapl_id) < 0)
+    if(set_fapl_parameter(tree, "sieve_buf_size", filename, real_fapl_id) < 0)
         ERROR("Unable to set FAPL parameter \"sieve_buf_size\"");
-    if(set_fapl_parameter(tree, "alignment", filename, fapl_id) < 0)
+    if(set_fapl_parameter(tree, "alignment", filename, real_fapl_id) < 0)
         ERROR("Unable to set FAPL parameter \"alignment\"");
 
 #ifdef DEBUG
     {
       int nkeys = -1;
-      if(MPI_Info_get_nkeys(orig_info, &nkeys) != MPI_SUCCESS)
+      if(MPI_Info_get_nkeys(new_info, &nkeys) != MPI_SUCCESS)
         ERROR("Unable to get number of MPI keys");
       /* printf("H5Tuner: completed parameters setting \n");
       printf("H5Tuner created MPI_Info object has %d keys!\n", nkeys); */
@@ -339,13 +348,13 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 #endif
 
     assert(driver == H5FD_MPIO);
-    if(H5Pset_fapl_mpio(fapl_id, orig_comm, orig_info) < 0)
+    if(H5Pset_fapl_mpio(real_fapl_id, new_comm, new_info) < 0)
         ERROR("Unable to set MPI file driver");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: calling H5Fcreate.\n"); */
 #endif
-    ret_value = __fake_H5Fcreate(new_filename ? new_filename : filename, flags, fcpl_id, fapl_id);
+    ret_value = __fake_H5Fcreate(new_filename ? new_filename : filename, flags, fcpl_id, real_fapl_id);
 
 done:
     if(fp && (fclose(fp) != 0))
@@ -353,6 +362,15 @@ done:
 
     free(new_filename);
     new_filename = NULL;
+
+    /*if((new_comm != MPI_COMM_NULL) && (MPI_Comm_free(&new_comm) != MPI_SUCCESS))
+        DONE_ERROR("Failure freeing MPI comm");
+    if((new_info != MPI_INFO_NULL) && (MPI_Info_free(&new_info) != MPI_SUCCESS))
+        DONE_ERROR("Failure freeing MPI info");*/
+
+    if((ret_value < 0) && (real_fapl_id >= 0) && (H5Pclose(real_fapl_id) < 0))
+        DONE_ERROR("Failure closing FAPL");
+    real_fapl_id = -1;
 
     return ret_value;
 }
