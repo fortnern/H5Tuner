@@ -85,7 +85,8 @@ herr_t set_mpi_parameter(mxml_node_t *tree, const char *parameter_name, const ch
             if(MPI_Info_set(*orig_info, parameter_name, node->child->value.text.string) != MPI_SUCCESS)
                 ERROR("Failed to set MPI info");
 
-            break;
+            if(node_file_name)
+                break;
         }
     }
 
@@ -121,7 +122,8 @@ hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const ch
                 if(H5Pset_sieve_buf_size(fapl_id, atoi(node->child->value.text.string)) < 0)
                     ERROR("Unable to set sieve buffer size");
 
-                break;
+                if(node_file_name)
+                    break;
             }
             else if(!strcmp(parameter_name, "alignment")) {
                 char *threshold = strtok(node->child->value.text.string, ",");
@@ -138,7 +140,8 @@ hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const ch
                 if(H5Pset_alignment(fapl_id, (hsize_t)strtoll(threshold, NULL, 10), (hsize_t)strtoll(alignment, NULL, 10)) < 0)
                     ERROR("Unable to set alignment");
 
-                break;
+                if(node_file_name)
+                    break;
             }
             else
                 ERROR("Unknown FAPL parameter");
@@ -222,7 +225,8 @@ herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const c
 
                     H5Pset_chunk(dcpl_id, ndims, chunk_arr);
 
-                    break;
+                    if(node_file_name && node_variable_name)
+                        break;
                 }
             }
             else
