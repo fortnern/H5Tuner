@@ -11,7 +11,6 @@
 */
 
 #include "autotuner_private.h"
-#include <libgen.h>
 #define __USE_GNU
 #include <dlfcn.h>
 
@@ -34,18 +33,25 @@
 herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, /* OUT */ char **new_filename)
 {
     const char *node_file_name;
+    const char *file_basename;
     mxml_node_t *node;
     herr_t ret_value = SUCCEED;
+
+    /* Retrieve base name for filename */
+    if(NULL == (file_basename = strrchr(filename, '/')))
+        file_basename = filename;
+    else
+        file_basename++;
 
     for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL, MXML_DESCEND);
             node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL, MXML_DESCEND)) {
         node_file_name = mxmlElementGetAttr(node, "FileName");
 #ifdef DEBUG
-        /* printf("Node_file_name: %s\n", node_file_name); */
+        printf("Node_file_name: %s\n", node_file_name);
 #endif
-        // TODO: Change this strstr() function call with a use of basename!
-        if(!node_file_name || strstr(filename, node_file_name)) {
+        if(!node_file_name || !strcmp(file_basename, node_file_name)) {
             if(!strcmp(parameter_name, "IBM_lockless_io")) {
+            printf("Node_file_name: %s\n", node_file_name);
                 if(!strcmp(node->child->value.text.string, "true")) {
                     /* to prefix the filename with "bglockless:". */
                     if(NULL == (*new_filename = (char *)malloc(sizeof(char) * (strlen(filename) + sizeof("bglockless:")))))
@@ -53,9 +59,10 @@ herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const c
 
                     strcpy(*new_filename, "bglockless:");
                     strcat(*new_filename, filename);
-
-                    break;
                 }
+
+                if(node_file_name)
+                    break;
             }
             else
                 ERROR("Unknown GPFS parameter");

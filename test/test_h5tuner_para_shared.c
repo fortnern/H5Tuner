@@ -40,7 +40,6 @@
 #include "hdf5.h"
 #include <string.h>
 #include <stdlib.h>
-#include <libgen.h>
 
 #ifdef H5_HAVE_PARALLEL
 /* Temporary source code */
@@ -502,10 +501,10 @@ phdf5writeAll(char *filename)
     hsize_t start[SPACE1_RANK]; /* for hyperslab setting */
     hsize_t count[SPACE1_RANK], stride[SPACE1_RANK]; /* for hyperslab setting */
 
-    char *base_filename = basename(filename);
-
     hsize_t alignment[2];
     size_t sieve_buf_size;
+
+    const char *base_filename;
 
     herr_t tmp_ret;
     herr_t ret;                 /* Generic return value */
@@ -513,6 +512,11 @@ phdf5writeAll(char *filename)
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Info info = MPI_INFO_NULL;
 
+    /* Retrieve base name for filename */
+    if(NULL == (base_filename = strrchr(filename, '/')))
+        base_filename = filename;
+    else
+        base_filename++;
 
     /* in support of H5Tuner Test */
     MPI_Comm comm_test = MPI_COMM_WORLD;
@@ -781,6 +785,72 @@ phdf5writeAll(char *filename)
     }
     assert(ret != FAIL);
     MESG("Striping Factor Test succeeded");
+
+#ifdef TEST_GPFS
+    /* Enable this, along with the "IBM_lockless_io" line in config.xml, if
+     * MPI accepts "bglockless:" as a file prefix.  TODO: add configure test for
+     * this. */
+    {
+        ssize_t name_len;
+        const char *base_h5_filename;
+        char h5_filename[32];
+
+        /* Check file name */
+        name_len = H5Fget_name(fid1, h5_filename, sizeof(h5_filename));
+        assert(name_len >= 0);
+        assert(name_len <= 31);
+        MESG("H5Fget_name succeed. Value Retrieved");
+        if ( verbose ) {
+            printf("\n\n--------------------------------------------------\n");
+            printf("Testing filename manipulation for IBM_lockless_io\n");
+            printf("--------------------------------------------------\n");
+            printf("Retrieved filename=\"%s\"\n", h5_filename);
+        }
+
+        /* Retrieve base name for h5_filename */
+        if(NULL == (base_h5_filename = strrchr(h5_filename, '/')))
+            base_h5_filename = h5_filename;
+        else
+            base_h5_filename++;
+
+        if(!strcmp(base_filename, "ParaEg2.h5")) {
+            if(!strncmp(h5_filename, "bglockless:", 11)) {
+                if(verbose)
+                    printf("PASSED: \"bglockless:\" prefix test\n");
+            }
+            else {
+                ret = FAIL;
+                nerrors++;
+                printf("FAILED: \"bglockless:\" prefix test\n");
+                printf("base_h5_filename = \"%s\", expected \"bglockless:%s\"\n", base_h5_filename, base_filename);
+            }
+            if(!strcmp(base_h5_filename, base_filename)) {
+                if(verbose)
+                    printf("PASSED: Filename test\n");
+            }
+            else {
+                ret = FAIL;
+                nerrors++;
+                printf("FAILED: \"bglockless:\" prefix test\n");
+                printf("base_h5_filename = \"%s\", expected \"%s\"\n", base_h5_filename, base_filename);
+            }
+        }
+        else {
+            if(!strcmp(base_h5_filename, base_filename)) {
+                if(verbose)
+                    printf("PASSED: Filename test\n");
+            }
+            else {
+                ret = FAIL;
+                nerrors++;
+                printf("FAILED: \"bglockless:\" prefix test\n");
+                printf("base_h5_filename = \"%s\", expected \"%s\"\n", base_h5_filename, base_filename);
+            }
+        }
+        assert(ret != FAIL);
+    }
+#endif
+
 
     /* end of H5Tuner tests
        --------------------------------------- */
