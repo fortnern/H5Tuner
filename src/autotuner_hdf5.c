@@ -33,25 +33,25 @@
 herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, /* OUT */ char **new_filename)
 {
     const char *node_file_name;
-    const char *file_basename;
+    const char *file_basename = NULL;
     mxml_node_t *node;
     herr_t ret_value = SUCCEED;
-
-    /* Retrieve base name for filename */
-    if(NULL == (file_basename = strrchr(filename, '/')))
-        file_basename = filename;
-    else
-        file_basename++;
 
     for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL, MXML_DESCEND);
             node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL, MXML_DESCEND)) {
         node_file_name = mxmlElementGetAttr(node, "FileName");
-#ifdef DEBUG
-        printf("Node_file_name: %s\n", node_file_name);
-#endif
-        if(!node_file_name || !strcmp(file_basename, node_file_name)) {
-            if(!strcmp(parameter_name, "IBM_lockless_io")) {
-            printf("Node_file_name: %s\n", node_file_name);
+
+        /* Retrieve base name for filename */
+        if(!file_basename) {
+            if(NULL == (file_basename = strrchr(filename, '/')))
+                file_basename = filename;
+            else
+                file_basename++;
+        }
+
+        if(!strcmp(parameter_name, "IBM_lockless_io")) {
+            /* Check if this parameter applies to this file */
+            if(!node_file_name || !strcmp(file_basename, node_file_name)) {
                 if(!strcmp(node->child->value.text.string, "true")) {
                     /* to prefix the filename with "bglockless:". */
                     if(NULL == (*new_filename = (char *)malloc(sizeof(char) * (strlen(filename) + sizeof("bglockless:")))))
@@ -77,6 +77,7 @@ done:
 herr_t set_mpi_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, MPI_Info *orig_info)
 {
     const char *node_file_name;
+    const char *file_basename = NULL;
     mxml_node_t *node;
     herr_t ret_value = SUCCEED;
 
@@ -84,11 +85,16 @@ herr_t set_mpi_parameter(mxml_node_t *tree, const char *parameter_name, const ch
             node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL,MXML_DESCEND)) {
         node_file_name = mxmlElementGetAttr(node, "FileName");
 
-#ifdef DEBUG
-        /* printf("Node_file_name: %s\n", node_file_name); */
-#endif
-        /* MSC - CHECK usage of strstr().. need to switch to strcmp() probably */
-        if(!node_file_name || strstr(filename, node_file_name)) {
+        /* Retrieve base name for filename */
+        if(!file_basename) {
+            if(NULL == (file_basename = strrchr(filename, '/')))
+                file_basename = filename;
+            else
+                file_basename++;
+        }
+
+        /* Check if this parameter applies to this file */
+        if(!node_file_name || !strcmp(file_basename, node_file_name)) {
             if(MPI_Info_set(*orig_info, parameter_name, node->child->value.text.string) != MPI_SUCCESS)
                 ERROR("Failed to set MPI info");
 
@@ -110,18 +116,25 @@ set_hdf5_dcreate_parameter(file_name, dataset_name, ...);*/
 hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, hid_t fapl_id)
 {
     const char *node_file_name;
+    const char *file_basename = NULL;
     mxml_node_t *node;
     herr_t ret_value = SUCCEED;
-    hid_t dcpl_id=-1;
+    hid_t dcpl_id = -1;
 
     for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL,MXML_DESCEND);
             node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL,MXML_DESCEND)) {
         node_file_name = mxmlElementGetAttr(node, "FileName");
-#ifdef DEBUG
-          /* printf("Node_file_name: %s\n", node_file_name); */
-#endif
-        /* MSC - strstr() wrong usage here */
-        if(!node_file_name || strstr(filename, node_file_name))  {
+
+        /* Retrieve base name for filename */
+        if(!file_basename) {
+            if(NULL == (file_basename = strrchr(filename, '/')))
+                file_basename = filename;
+            else
+                file_basename++;
+        }
+
+        /* Check if this parameter applies to this file */
+        if(!node_file_name || !strcmp(file_basename, node_file_name))  {
 #ifdef DEBUG
             /* printf("H5Tuner: setting %s: %s\n", parameter_name, node->child->value.text.string); */
 #endif
@@ -163,6 +176,7 @@ done:
 herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, const char *variable_name, hid_t space_id, hid_t dcpl_id)
 {
     const char *node_file_name;
+    const char *file_basename = NULL;
     mxml_node_t *node;
     hsize_t *dims = NULL;
     hsize_t *chunk_arr = NULL;
@@ -171,11 +185,17 @@ herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const c
     for(node = mxmlFindElement(tree, tree, parameter_name, NULL, NULL,MXML_DESCEND);
             node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL,MXML_DESCEND)) {
         node_file_name = mxmlElementGetAttr(node, "FileName");
-#ifdef DEBUG
-          /* printf("Node_file_name: %s\n", node_file_name); */
-#endif
+
+        /* Retrieve base name for filename */
+        if(!file_basename) {
+            if(NULL == (file_basename = strrchr(filename, '/')))
+                file_basename = filename;
+            else
+                file_basename++;
+        }
+
         /* MSC - strstr() wrong usage here */
-        if(!node_file_name || strstr(filename, node_file_name))  {
+        if(!node_file_name || !strcmp(file_basename, node_file_name))  {
 #ifdef DEBUG
             /* printf("H5Tuner: setting %s: %s\n", parameter_name, node->child->value.text.string); */
 #endif
