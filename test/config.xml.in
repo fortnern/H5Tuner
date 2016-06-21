@@ -16,5 +16,6 @@
 		<striping_factor FileName="ParaEg0.h5">7</striping_factor>
 		<striping_factor FileName="ParaEg1.h5">1</striping_factor>
 		<striping_unit>6556</striping_unit>
+        <!-- <IBM_lockless_io FileName="ParaEg2.h5">true</IBM_lockless_io> -->
 	</Parallel_File_System>
 </Parameters>
