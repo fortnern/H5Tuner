@@ -937,7 +937,7 @@ phdf5readAll(char *filename)
     MESG("H5Dopen2 succeed");
 
     /* open another dataset collectively */
-    dataset2 = H5Dopen2(fid1, DATASETNAME1, H5P_DEFAULT);
+    dataset2 = H5Dopen2(fid1, DATASETNAME2, H5P_DEFAULT);
     assert(dataset2 != FAIL);
     MESG("H5Dopen2 2 succeed");
 

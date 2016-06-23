@@ -176,7 +176,8 @@ done:
 herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, const char *variable_name, hid_t space_id, hid_t dcpl_id)
 {
     const char *node_file_name;
-    const char *file_basename = NULL;
+    size_t filename_len = strlen(filename);
+    size_t node_file_name_len;
     mxml_node_t *node;
     hsize_t *dims = NULL;
     hsize_t *chunk_arr = NULL;
@@ -186,24 +187,24 @@ herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const c
             node != NULL; node = mxmlFindElement(node, tree, parameter_name, NULL, NULL,MXML_DESCEND)) {
         node_file_name = mxmlElementGetAttr(node, "FileName");
 
-        /* Retrieve base name for filename */
-        if(!file_basename) {
-            if(NULL == (file_basename = strrchr(filename, '/')))
-                file_basename = filename;
-            else
-                file_basename++;
+        if(node_file_name) {
+            /* Retrieve length of node_file_name.  filename could include a prefix,
+             * so it could be longer than node_file_name, and still be a match but
+             * the reverse cannot be true.  We will compare the trailing bytes of
+             * filename to node_file_name to see if they refer to the same file. */
+            node_file_name_len = strlen(node_file_name);
+
+            /* Check for node_file_name longer than filename */
+            if(node_file_name_len > filename_len)
+                continue;
         }
 
-        /* MSC - strstr() wrong usage here */
-        if(!node_file_name || !strcmp(file_basename, node_file_name))  {
-#ifdef DEBUG
-            /* printf("H5Tuner: setting %s: %s\n", parameter_name, node->child->value.text.string); */
-#endif
+        /* Check if this parameter applies to this file */
+        if(!node_file_name || !strcmp(filename + (filename_len - node_file_name_len), node_file_name))  {
             if(!strcmp(parameter_name, "chunk")) {
                 const char* node_variable_name = mxmlElementGetAttr(node, "VariableName");
-#ifdef DEBUG
-                printf("H5Tuner: VariableName: %s\n", node_variable_name);
-#endif
+
+                /* Check if this parameter applies to this dataset */
                 if(!node_variable_name || (!strcmp(node_variable_name, variable_name))) {
                     char *chunk_dim_str;
                     long long chunk_dim_ll;

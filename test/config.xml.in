@@ -4,6 +4,10 @@
 		<sieve_buf_size>77</sieve_buf_size>
 		<alignment>88,44</alignment>
 		<!-- H5Pset_alignment function gets 2 args: (Threshold, Alignment) -->
+        <chunk>6,5</chunk>
+        <chunk FileName="ParaEg2.h5">4,5</chunk>
+        <chunk VariableName="Data2">6,7</chunk>
+        <chunk FileName="ParaEg2.h5" VariableName="Data2">4,7</chunk>
 	</High_Level_IO_Library>
 
 	<Middleware_Layer>

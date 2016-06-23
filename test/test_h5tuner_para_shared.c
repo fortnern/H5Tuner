@@ -474,6 +474,106 @@ phdf5readInd(char *filename)
 }
 
 
+/* Function to check if a dataset's DCPL has been set up correctly by H5Tuner */
+void
+test_dcpl(hid_t dset_id, const char *dset_name, const char *base_filename)
+{
+    hid_t dcpl_id;
+    H5D_layout_t layout;
+    hsize_t cdims[SPACE1_RANK];     /* Chunk dimensions */
+    int ndims;
+    herr_t ret = 0;                 /* Generic return value */
+
+    if ( verbose ) {
+        printf("\n\n--------------------------------------------------\n");
+        printf("Testing chunk dimensions\n");
+        printf("--------------------------------------------------\n");
+    }
+
+    /* Retrieve dataset's DCPL */
+    dcpl_id = H5Dget_create_plist(dset_id);
+    assert(dcpl_id != FAIL);
+
+    /* Check layout of dcpl_id */
+    layout = H5Pget_layout(dcpl_id);
+    assert(layout != H5D_LAYOUT_ERROR);
+    if(layout == H5D_CHUNKED) {
+        if(verbose)
+            printf("PASSED: Retrieved layout type\n");
+    }
+    else {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Retrieved layout type\n");
+    }
+
+    /* Get chunk dimensions */
+    ndims = H5Pget_chunk(dcpl_id, SPACE1_RANK, cdims);
+    assert(ndims != FAIL);
+    if(ndims != SPACE1_RANK) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Retrieved layout chunk rank\n");
+    }
+
+    /* Check chunk dimensions */
+    if(!strcmp(base_filename, "ParaEg2.h5")) {
+        if(cdims[0] == 4) {
+            if(verbose)
+                printf("PASSED: cdims[0]\n");
+        }
+        else {
+            ret = FAIL;
+            nerrors++;
+            printf("FAILED: Retrieved layout chunk dims[0]\n");
+            printf("Test value set to: 4\nRetrieved cdims[0]=%llu\n", (long long unsigned)cdims[0]);
+        }
+    }
+    else {
+        if(cdims[0] == 6) {
+            if(verbose)
+                printf("PASSED: cdims[0]\n");
+        }
+        else {
+            ret = FAIL;
+            nerrors++;
+            printf("FAILED: Retrieved layout chunk dims[0]\n");
+            printf("Test value set to: 6\nRetrieved cdims[0]=%llu\n", (long long unsigned)cdims[0]);
+        }
+    }
+    if(!strcmp(dset_name, "Data2")) {
+        if(cdims[1] == 7) {
+            if(verbose)
+                printf("PASSED: cdims[1]\n");
+        }
+        else {
+            ret = FAIL;
+            nerrors++;
+            printf("FAILED: Retrieved layout chunk dims[1]\n");
+            printf("Test value set to: 7\nRetrieved cdims[1]=%llu\n", (long long unsigned)cdims[1]);
+        }
+    }
+    else {
+        if(cdims[1] == 5) {
+            if(verbose)
+                printf("PASSED: cdims[1]\n");
+        }
+        else {
+            ret = FAIL;
+            nerrors++;
+            printf("FAILED: Retrieved layout chunk dims[1]\n");
+            printf("Test value set to: 5\nRetrieved cdims[1]=%llu\n", (long long unsigned)cdims[1]);
+        }
+    }
+    assert(ret != FAIL);
+
+    ret = H5Pclose(dcpl_id);
+    assert(ret != FAIL);
+
+    return;
+}
+
+
 /*
  * Example of using the parallel HDF5 library to create two datasets
  * in one HDF5 file with collective parallel access support.
@@ -489,6 +589,7 @@ phdf5writeAll(char *filename)
     hid_t fid1;                 /* HDF5 file IDs */
     hid_t acc_tpl1;             /* File access templates */
     hid_t acc_tpl2;             /* FAPL retrieved from file */
+    hid_t dcpl_id;              /* Default DCPL */
     hid_t xfer_plist;           /* Dataset transfer properties list */
     hid_t sid1;                 /* Dataspace ID */
     hid_t file_dataspace;       /* File dataspace ID */
@@ -503,6 +604,7 @@ phdf5writeAll(char *filename)
 
     hsize_t alignment[2];
     size_t sieve_buf_size;
+    H5D_layout_t layout;
 
     const char *base_filename;
 
@@ -872,16 +974,53 @@ phdf5writeAll(char *filename)
     assert (sid1 != FAIL);
     MESG("H5Screate_simple succeed");
 
+    /* Set up default DCPL */
+    dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    assert(dcpl_id != FAIL);
+
+    /* Check layout of dcpl_id */
+    layout = H5Pget_layout(dcpl_id);
+    assert(layout != H5D_LAYOUT_ERROR);
+    if(layout != H5D_CONTIGUOUS) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Default layout type\n");
+    }
+    assert(ret != FAIL);
 
     /* create a dataset collectively */
-    dataset1 = H5Dcreate2(fid1, DATASETNAME1, H5T_NATIVE_INT, sid1, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset1 = H5Dcreate2(fid1, DATASETNAME1, H5T_NATIVE_INT, sid1, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
     assert(dataset1 != FAIL);
     MESG("H5Dcreate2 succeed");
 
     /* create another dataset collectively */
-    dataset2 = H5Dcreate2(fid1, DATASETNAME2, H5T_NATIVE_INT, sid1, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dataset2 = H5Dcreate2(fid1, DATASETNAME2, H5T_NATIVE_INT, sid1, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
     assert(dataset2 != FAIL);
     MESG("H5Dcreate2 2 succeed");
+
+    /* ------------------------------------------------
+       H5Tuner tests
+       ------------------------------------------------ */
+
+    /* Check layout of dcpl_id (should not have changed) */
+    layout = H5Pget_layout(dcpl_id);
+    assert(layout != H5D_LAYOUT_ERROR);
+    if(layout != H5D_CONTIGUOUS) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Default layout type post H5Dcreate\n");
+    }
+    assert(ret != FAIL);
+
+    test_dcpl(dataset1, DATASETNAME1, base_filename);
+    test_dcpl(dataset2, DATASETNAME2, base_filename);
+
+    /* end of H5Tuner tests
+       --------------------------------------- */
+
+    /* Close dcpl_id */
+    ret = H5Pclose(dcpl_id);
+    assert(ret != FAIL);
 
     /*
      * Set up dimensions of the slab this process accesses.
@@ -1023,6 +1162,7 @@ phdf5readAll(char *filename)
 {
     hid_t fid1;                 /* HDF5 file IDs */
     hid_t acc_tpl1;             /* File access templates */
+    hid_t dcpl_id;              /* Default DCPL */
     hid_t xfer_plist;           /* Dataset transfer properties list */
     hid_t file_dataspace;       /* File dataspace ID */
     hid_t mem_dataspace;        /* memory dataspace ID */
@@ -1033,10 +1173,18 @@ phdf5readAll(char *filename)
     hsize_t start[SPACE1_RANK]; /* for hyperslab setting */
     hsize_t count[SPACE1_RANK], stride[SPACE1_RANK]; /* for hyperslab setting */
 
+    const char *base_filename;
+
     herr_t ret;                 /* Generic return value */
 
     MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Info info = MPI_INFO_NULL;
+
+    /* Retrieve base name for filename */
+    if(NULL == (base_filename = strrchr(filename, '/')))
+        base_filename = filename;
+    else
+        base_filename++;
 
     if (verbose)
         printf("Collective read test on file %s\n", filename);
@@ -1072,9 +1220,19 @@ phdf5readAll(char *filename)
     MESG("H5Dopen2 succeed");
 
     /* open another dataset collectively */
-    dataset2 = H5Dopen2(fid1, DATASETNAME1, H5P_DEFAULT);
+    dataset2 = H5Dopen2(fid1, DATASETNAME2, H5P_DEFAULT);
     assert(dataset2 != FAIL);
     MESG("H5Dopen2 2 succeed");
+
+    /* ------------------------------------------------
+       H5Tuner tests
+       ------------------------------------------------ */
+
+    test_dcpl(dataset1, DATASETNAME1, base_filename);
+    test_dcpl(dataset2, DATASETNAME2, base_filename);
+
+    /* end of H5Tuner tests
+       --------------------------------------- */
 
     /*
      * Set up dimensions of the slab this process accesses.
