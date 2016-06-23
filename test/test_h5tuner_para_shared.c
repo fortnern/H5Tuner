@@ -924,7 +924,7 @@ phdf5writeAll(char *filename)
                 ret = FAIL;
                 nerrors++;
                 printf("FAILED: \"bglockless:\" prefix test\n");
-                printf("base_h5_filename = \"%s\", expected \"bglockless:%s\"\n", base_h5_filename, base_filename);
+                printf("base_h5_filename = \"%s\", expected prefix \"bglockless:%s\"\n", h5_filename);
             }
             if(!strcmp(base_h5_filename, base_filename)) {
                 if(verbose)
