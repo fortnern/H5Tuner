@@ -602,6 +602,12 @@ phdf5writeAll(char *filename)
     hsize_t start[SPACE1_RANK]; /* for hyperslab setting */
     hsize_t count[SPACE1_RANK], stride[SPACE1_RANK]; /* for hyperslab setting */
 
+    /* in support of H5Tuner Test */
+    MPI_Comm comm_test = MPI_COMM_WORLD;
+    MPI_Info info_test;
+    int i_test, nkeys_test, flag_test;
+    char key[MPI_MAX_INFO_KEY], value[MPI_MAX_INFO_VAL+1];
+    char *libtuner_file = getenv("LD_PRELOAD");
     hsize_t alignment[2];
     size_t sieve_buf_size;
     H5D_layout_t layout;
@@ -620,12 +626,6 @@ phdf5writeAll(char *filename)
     else
         base_filename++;
 
-    /* in support of H5Tuner Test */
-    MPI_Comm comm_test = MPI_COMM_WORLD;
-    MPI_Info info_test ;
-    int i_test, nkeys_test, flag_test;
-    char key[MPI_MAX_INFO_KEY], value[MPI_MAX_INFO_VAL+1];
-    char *libtuner_file = getenv("LD_PRELOAD");
     /* in support of H5Tuner Test */
 
     if (verbose)
@@ -1520,13 +1520,13 @@ parse_options(int argc, char **argv){
 
     /* check the file prefix */
     if (testfiles[0][0] == '\0'){
-	/* try get it from environment variable HDF5_PARAPREFIX */
-	char *env;
-	char *env_default = ".";	/* default to current directory */
-	if ((env=getenv(PARAPREFIX))==NULL){
-	    env = env_default;
-	}
-	mkfilenames(env);
+        /* try get it from environment variable HDF5_PARAPREFIX */
+        char *env;
+        char *env_default = ".";	/* default to current directory */
+        if ((env=getenv(PARAPREFIX))==NULL){
+            env = env_default;
+        }
+        mkfilenames(env);
     }
     return(0);
 }
@@ -1542,7 +1542,7 @@ cleanup(void)
 
     n = sizeof(testfiles)/sizeof(testfiles[0]);
     for (i=0; i<n; i++){
-	MPI_File_delete(testfiles[i], MPI_INFO_NULL);
+        MPI_File_delete(testfiles[i], MPI_INFO_NULL);
     }
 }
 
