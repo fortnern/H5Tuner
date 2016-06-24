@@ -29,6 +29,11 @@
         } \
     }
 
+
+/* Global to indicate verbose output */
+int verbose_g;
+
+
 /* MSC - Needs a test */
 herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, /* OUT */ char **new_filename)
 {
@@ -53,6 +58,10 @@ herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const c
             /* Check if this parameter applies to this file */
             if(!node_file_name || !strcmp(file_basename, node_file_name)) {
                 if(!strcmp(node->child->value.text.string, "true")) {
+                    if(verbose_g >= 3) {
+                        printf("    Setting GPFS paramenter %s: %s for %s\n", parameter_name, node->child->value.text.string, filename);
+                    }
+
                     /* to prefix the filename with "bglockless:". */
                     if(NULL == (*new_filename = (char *)malloc(sizeof(char) * (strlen(filename) + sizeof("bglockless:")))))
                         ERROR("Unable to allocate new filename");
@@ -95,6 +104,10 @@ herr_t set_mpi_parameter(mxml_node_t *tree, const char *parameter_name, const ch
 
         /* Check if this parameter applies to this file */
         if(!node_file_name || !strcmp(file_basename, node_file_name)) {
+            if(verbose_g >= 3) {
+                printf("    Setting MPI paramenter %s: %s for %s\n", parameter_name, node->child->value.text.string, filename);
+            }
+
             if(MPI_Info_set(*orig_info, parameter_name, node->child->value.text.string) != MPI_SUCCESS)
                 ERROR("Failed to set MPI info");
 
@@ -106,11 +119,6 @@ herr_t set_mpi_parameter(mxml_node_t *tree, const char *parameter_name, const ch
 done:
     return ret_value;
 }
-
-/*(tree, "chunk", "D1", space_id);
-
-set_hdf5_fcreate_parameter(file_name, ...)
-set_hdf5_dcreate_parameter(file_name, dataset_name, ...);*/
 
 
 hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, hid_t fapl_id)
@@ -139,25 +147,57 @@ hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const ch
             /* printf("H5Tuner: setting %s: %s\n", parameter_name, node->child->value.text.string); */
 #endif
             if(!strcmp(parameter_name, "sieve_buf_size")) {
-                if(H5Pset_sieve_buf_size(fapl_id, atoi(node->child->value.text.string)) < 0)
+                long long sieve_size;
+
+                errno = 0;
+                sieve_size = strtoll(node->child->value.text.string, NULL, 10);
+                if(errno != 0)
+                    ERROR("Unable to parse sieve buffer size");
+                if(sieve_size < 0)
+                    ERROR("Invalid value for sieve buffer size");
+
+                if(verbose_g >= 3) {
+                    printf("    Setting sieve buffer size: %lld for %s\n", sieve_size, filename);
+                }
+
+                if(H5Pset_sieve_buf_size(fapl_id, (size_t)sieve_size) < 0)
                     ERROR("Unable to set sieve buffer size");
 
                 if(node_file_name)
                     break;
             }
             else if(!strcmp(parameter_name, "alignment")) {
-                char *threshold = strtok(node->child->value.text.string, ",");
-                char *alignment = strtok(NULL, ",");
+                char *tmp_str;
+                long long threshold;
+                long long alignment;
 
-                if(threshold == NULL)
+                tmp_str = strtok(node->child->value.text.string, ",");
+                if(tmp_str == NULL)
                     ERROR("Unable to read alignment threshold");
-                if(alignment == NULL)
+
+                errno = 0;
+                threshold = strtoll(tmp_str, NULL, 10);
+                if(errno != 0)
+                    ERROR("Unable to parse alignment threshold");
+                if(threshold < 0)
+                    ERROR("Invalid value for alignment threshold");
+
+                tmp_str = strtok(NULL, ",");
+                if(tmp_str == NULL)
                     ERROR("Unable to read alignment");
 
-#ifdef DEBUG
-                /* printf("H5Tuner: setting Threshold=%s; Alignment=%s\n", threshold, alignment); */
-#endif
-                if(H5Pset_alignment(fapl_id, (hsize_t)strtoll(threshold, NULL, 10), (hsize_t)strtoll(alignment, NULL, 10)) < 0)
+                errno = 0;
+                alignment = strtoll(tmp_str, NULL, 10);
+                if(errno != 0)
+                    ERROR("Unable to parse alignment");
+                if(alignment < 0)
+                    ERROR("Invalid value for alignment");
+
+                if(verbose_g >= 3) {
+                    printf("    Setting threshold: %lld, alignment: %lld for %s\n", threshold, alignment, filename);
+                }
+
+                if(H5Pset_alignment(fapl_id, (hsize_t)threshold, (hsize_t)alignment) < 0)
                     ERROR("Unable to set alignment");
 
                 if(node_file_name)
@@ -172,7 +212,7 @@ done:
     return ret_value;
 }
 
-/* MSC - This is not tested with chunk and will no get in to chunk setting with H5Dcreate() */
+
 herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, const char *variable_name, hid_t space_id, hid_t dcpl_id)
 {
     const char *node_file_name;
@@ -234,9 +274,7 @@ herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const c
                     if(chunk_dim_ll <= 0)
                         ERROR("Invalid chunk dimension");
                     chunk_arr[0] = (hsize_t)chunk_dim_ll;
-#ifdef DEBUG
-    /* printf("H5Tuner: Setting chunk[0] for %s -> %d\n", filename, chunk_arr[0]); */
-#endif
+
                     for(i = 1; i < ndims; i++) {
                         if(NULL == (chunk_dim_str = strtok(NULL, ",")))
                             ERROR("Unable to find chunk dimension in attribute string");
@@ -246,9 +284,16 @@ herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const c
                         if(chunk_dim_ll <= 0)
                             ERROR("Invalid chunk dimension");
                         chunk_arr[i] = (hsize_t)chunk_dim_ll;
-                        #ifdef DEBUG
-                          /* printf("H5Tuner: Setting chunk[%d] for %s -> %d\n", i, filename, chunk_arr[i]); */
-                        #endif
+                    }
+
+                    if(verbose_g >= 3) {
+                        printf("    Setting chunk size: {");
+                        for(i = 0; i < ndims; i++) {
+                            printf("%llu", (long long unsigned)chunk_arr[i]);
+                            if(i < (ndims - 1))
+                                printf(", ");
+                        }
+                        printf("} for %s: %s\n", filename, variable_name);
                     }
 
                     H5Pset_chunk(dcpl_id, ndims, chunk_arr);
@@ -267,6 +312,20 @@ done:
     dims = NULL;
 
     return ret_value;
+}
+
+
+void
+set_verbose(void)
+{
+    char *verbose = getenv("H5TUNER_VERBOSE");
+
+    if(verbose)
+        verbose_g = (int)strtol(verbose, NULL, 10);
+    else
+        verbose_g = 0;
+
+    return;
 }
 
 
@@ -291,7 +350,13 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 
     MAP_OR_FAIL(H5Fcreate);
 
-      /* printf("\nH5Tuner: Loading parameters file: %s\n", file_path); */
+    set_verbose();
+
+    if(verbose_g) {
+        printf("Entering H5Tuner/H5Fcreate()\n");
+        if(verbose_g >= 2)
+            printf("  Loading parameters file: %s\n", config_file ? config_file : "config.xml");
+    }
 
     if(NULL == (fp = fopen(config_file ? config_file : "config.xml", "r")))
         ERROR("Unable to open config file");
@@ -395,6 +460,11 @@ herr_t DECL(H5Dwrite)(hid_t dataset_id, hid_t mem_type_id, hid_t mem_space_id, h
 
     MAP_OR_FAIL(H5Dwrite);
 
+    set_verbose();
+
+    if(verbose_g)
+        printf("Entering H5Tuner/H5Dwrite()\n");
+
 #ifdef DEBUG
     /* printf("dataset_id: %d\n", dataset_id);
       printf("mem_type_id: %d\n", mem_type_id);
@@ -421,6 +491,9 @@ hid_t prepare_dcpl(hid_t loc_id, const char *name, hid_t space_id, hid_t dcpl_id
     ssize_t h5_filename_len;
     hid_t copied_dcpl_id = -1;
     hid_t ret_value = -1;
+
+    if(verbose_g >= 2)
+        printf("  Loading parameters file: %s\n", config_file ? config_file : "config.xml");
 
     if(NULL == (fp = fopen(config_file ? config_file : "config.xml", "r")))
         ERROR("Unable to open config file");
@@ -469,6 +542,11 @@ hid_t DECL(H5Dcreate1)(hid_t loc_id, const char *name, hid_t type_id, hid_t spac
 
     MAP_OR_FAIL(H5Dcreate1);
 
+    set_verbose();
+
+    if(verbose_g)
+        printf("Entering H5Tuner/H5Dcreate1()\n");
+
 #ifdef DEBUG
       /* printf("\nH5Tuner: Loading parameters file for H5Dcreate1: %s\n", file_path); */
 #endif
@@ -496,6 +574,11 @@ hid_t DECL(H5Dcreate2)(hid_t loc_id, const char *name, hid_t dtype_id, hid_t spa
     hid_t ret_value = -1;
 
     MAP_OR_FAIL(H5Dcreate2);
+
+    set_verbose();
+
+    if(verbose_g)
+        printf("Entering H5Tuner/H5Dcreate2()\n");
 
 #ifdef DEBUG
       /* printf("\nH5Tuner: Loading parameters file for H5Dcreate2: %s\n", file_path); */
