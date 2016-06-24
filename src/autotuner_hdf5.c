@@ -285,20 +285,15 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
     FILE *fp = NULL;
     mxml_node_t *tree;
     char *new_filename = NULL;
-    char file_path[1024];
+    char *config_file = getenv("H5TUNER_CONFIG_FILE");
     hid_t real_fapl_id = -1;
     hid_t driver;
 
     MAP_OR_FAIL(H5Fcreate);
 
-    strcpy(file_path, "config.xml");
-    /* char *config_file = getenv("AT_CONFIG_FILE"); */
-    /* char *file_path = config_file ; */
-  #ifdef DEBUG
       /* printf("\nH5Tuner: Loading parameters file: %s\n", file_path); */
-  #endif
 
-    if(NULL == (fp = fopen(file_path, "r")))
+    if(NULL == (fp = fopen(config_file ? config_file : "config.xml", "r")))
         ERROR("Unable to open config file");
     if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
         ERROR("Unable to load config file");
@@ -421,15 +416,13 @@ hid_t prepare_dcpl(hid_t loc_id, const char *name, hid_t space_id, hid_t dcpl_id
 {
     FILE *fp = NULL;
     mxml_node_t *tree;
-    char file_path[1024];
+    char *config_file = getenv("H5TUNER_CONFIG_FILE");
     char *h5_filename = NULL;
     ssize_t h5_filename_len;
     hid_t copied_dcpl_id = -1;
     hid_t ret_value = -1;
 
-    strcpy(file_path, "config.xml");
-
-    if(NULL == (fp = fopen(file_path, "r")))
+    if(NULL == (fp = fopen(config_file ? config_file : "config.xml", "r")))
         ERROR("Unable to open config file");
     if(NULL == (tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK)))
         ERROR("Unable to load config file");
