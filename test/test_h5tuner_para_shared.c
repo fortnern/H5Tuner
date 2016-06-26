@@ -691,7 +691,7 @@ phdf5writeAll(char *filename)
         printf("\n\n--------------------------------------------------\n");
         printf("Testing values for Threshold\n");
         printf("--------------------------------------------------\n");
-        printf("Test value set to:88 \nRetrieved Threshold=%lu\n", alignment[0]);
+        printf("Test value set to:88 \nRetrieved Threshold=%llu\n", (long long unsigned)alignment[0]);
     }
     /* Check Threshold */
     if ( alignment[0] == 88 ) {
@@ -708,7 +708,7 @@ phdf5writeAll(char *filename)
         printf("\n\n--------------------------------------------------\n");
         printf("Testing values for Alignment\n");
         printf("--------------------------------------------------\n");
-        printf("Test value set to:44 \nRetrieved Alignment=%lu\n", alignment[1]);
+        printf("Test value set to:44 \nRetrieved Alignment=%llu\n", (long long unsigned)alignment[1]);
     }
     /* Check Alignment */
     if ( alignment[1] == 44 ) {
@@ -1162,7 +1162,7 @@ phdf5readAll(char *filename)
 {
     hid_t fid1;                 /* HDF5 file IDs */
     hid_t acc_tpl1;             /* File access templates */
-    hid_t dcpl_id;              /* Default DCPL */
+    hid_t acc_tpl2;             /* FAPL retrieved from file */
     hid_t xfer_plist;           /* Dataset transfer properties list */
     hid_t file_dataspace;       /* File dataspace ID */
     hid_t mem_dataspace;        /* memory dataspace ID */
@@ -1172,6 +1172,15 @@ phdf5readAll(char *filename)
 
     hsize_t start[SPACE1_RANK]; /* for hyperslab setting */
     hsize_t count[SPACE1_RANK], stride[SPACE1_RANK]; /* for hyperslab setting */
+
+    /* in support of H5Tuner Test */
+    MPI_Comm comm_test = MPI_COMM_WORLD;
+    MPI_Info info_test;
+    int i_test, nkeys_test, flag_test;
+    char key[MPI_MAX_INFO_KEY], value[MPI_MAX_INFO_VAL+1];
+    char *libtuner_file = getenv("LD_PRELOAD");
+    hsize_t alignment[2];
+    size_t sieve_buf_size;
 
     const char *base_filename;
 
@@ -1206,8 +1215,273 @@ phdf5readAll(char *filename)
     assert(fid1 != FAIL);
     MESG("H5Fopen succeed");
 
-    /* Release file-access template */
+    /* ------------------------------------------------
+       H5Tuner tests
+       ------------------------------------------------ */
+
+    /* Retrieve  parameters set via the H5Tuner */
+    printf("\n\n--------------------------------------------------\n");
+    if ( (libtuner_file != NULL) && (strlen(libtuner_file) > 1) ){
+        printf("Version of the H5Tuner loaded: \n%s\n", libtuner_file);
+    }
+    else {
+        printf("No H5Tuner currently loaded.\n");
+    }
+    printf("--------------------------------------------------\n");
+
+    /* Retrieve FAPL from file */
+    acc_tpl2 = H5Fget_access_plist(fid1);
+    assert(acc_tpl1 != FAIL);
+
+    /* Retrieve default HDF5 Threshold and Alignment */
+    ret = H5Pget_alignment(acc_tpl1, &alignment[0], &alignment[1]);
+    assert(ret != FAIL);
+
+    /* Verify default threshold and alignment */
+    if(alignment[0] != 1) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Default Threshold Test\n");
+    }
+    if(alignment[1] != 1) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Default Alignment Test\n");
+    }
+
+    /* Retrieve file HDF5 Threshold and Alignment */
+    ret = H5Pget_alignment(acc_tpl2, &alignment[0], &alignment[1]);
+    assert(ret != FAIL);
+
+    if ( verbose ) {
+        MESG("H5Pget_alignment succeed. Values Retrieved");
+        printf("\n\n--------------------------------------------------\n");
+        printf("Testing values for Threshold\n");
+        printf("--------------------------------------------------\n");
+        printf("Test value set to:88 \nRetrieved Threshold=%llu\n", (long long unsigned)alignment[0]);
+    }
+    /* Check Threshold */
+    if ( alignment[0] == 88 ) {
+        if (verbose)
+            printf("PASSED: Threshold Test\n");
+    }
+    else {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Threshold Test\n");
+    }
+    assert(ret != FAIL);
+    if ( verbose ) {
+        printf("\n\n--------------------------------------------------\n");
+        printf("Testing values for Alignment\n");
+        printf("--------------------------------------------------\n");
+        printf("Test value set to:44 \nRetrieved Alignment=%llu\n", (long long unsigned)alignment[1]);
+    }
+    /* Check Alignment */
+    if ( alignment[1] == 44 ) {
+        if (verbose)
+            printf("PASSED: Alignment Test\n");
+    }
+    else {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Alignment Test\n");
+    }
+    assert(ret != FAIL);
+
+    /* Retrieve default sieve buffer size */
+    ret = H5Pget_sieve_buf_size(acc_tpl1, &sieve_buf_size);
+    assert(ret != FAIL);
+
+    /* Verify default sieve buffer size */
+    if(sieve_buf_size != 65536) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Default Sieve Buffer Size Test\n");
+    }
+
+    /* Retrieve file sieve buffer size */
+    ret = H5Pget_sieve_buf_size(acc_tpl2, &sieve_buf_size);
+    assert(ret != FAIL);
+    MESG("H5Pget_sieve_buf_size succeed. Value Retrieved");
+    if ( verbose ) {
+        printf("\n\n--------------------------------------------------\n");
+        printf("Testing values for Sieve Buffer Size\n");
+        printf("--------------------------------------------------\n");
+        printf("Test value set to:77 \nRetrieved Sieve Buffer Size=%lu\n", sieve_buf_size);
+    }
+
+    /* Check sieve buffer size */
+    if ( (int) sieve_buf_size == 77 ) {
+        if ( verbose )
+            printf("PASSED: Sieve Buffer Size Test\n");
+    }
+    else {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Sieve Buffer Size Test\n");
+    }
+    assert(ret != FAIL);
+
+    MPI_Info_create(&info_test);
+
+    ret = H5Pget_fapl_mpio(acc_tpl2, &comm_test, &info_test);
+    assert(ret != FAIL);
+    MESG("H5Pget_fapl_mpio succeed");
+
+    if(verbose) {
+        printf("-------------------------------------------------\n" );
+        printf("Testing parameters values via MPI_Info\n" );
+        printf("-------------------------------------------------\n" );
+    }
+    if(info_test == MPI_INFO_NULL) {
+        ret = FAIL;
+        nerrors++;
+        printf("MPI info object is null. No keys are available.\n");
+    }
+    else {
+        MPI_Info_get_nkeys(info_test, &nkeys_test);
+
+        if (nkeys_test <= 0) {
+            ret = FAIL;
+            nerrors++;
+            printf("MPI info has no keys\n");
+        }
+        else {
+            int npasses = 0;
+
+            if ( verbose )
+                printf("MPI info has %d keys\n", nkeys_test);
+
+            for ( i_test=0; i_test < nkeys_test; i_test++) {
+                MPI_Info_get_nthkey( info_test, i_test, key );
+                MPI_Info_get( info_test, key, MPI_MAX_INFO_VAL, value, &flag_test );
+
+                /* Check the cb buffer size key */
+                if(!strcmp(key, "cb_buffer_size")) {
+                    /* Check the cb_buffer_size against a preset value */
+                    if(!strcmp(value, "631136")) {
+                        npasses++;
+                        if(verbose) {
+                            printf("PASSED: CB Buffer Size Test\n");
+                            printf( "Retrieved value for key %s is %s\n", key, value );
+                        }
+                    }
+                    else { /* cb buffer size retrieved does not match the setting. */
+                        ret = FAIL;
+                        nerrors++;
+                        printf("FAILED: CB Buffer Size Test\n");
+                        printf( "Retrieved value for key %s is %s\n", key, value );
+                    }
+                }
+
+                /* Check the cb nodes key */
+                if(!strcmp(key, "cb_nodes")) {
+                    /* Check the cb_nodes against a preset value */
+                    if(!strcmp(value, "22")) {
+                        npasses++;
+                        if(verbose) {
+                            printf("PASSED: CB Nodes Test\n");
+                            printf( "Retrieved value for key %s is %s\n", key, value );
+                        }
+                    }
+                    else { /* cb nodes retrieved does not match the setting. */
+                        ret = FAIL;
+                        nerrors++;
+                        printf("FAILED: CB nodes Test\n");
+                        printf( "Retrieved value for key %s is %s\n", key, value );
+                    }
+                }
+            }
+
+            /* Make sure all tests passed */
+            if(npasses != 2) {
+                ret = FAIL;
+                nerrors++;
+                printf("FAILED: Incorrect number of MPI Info tests passed\n");
+                printf("Expected: 2 Found: %d\n", npasses);
+            }
+        }
+
+        MPI_Info_free(&info_test);
+    }
+    assert(ret != FAIL);
+    MESG("Striping Factor Test succeeded");
+
+#ifdef TEST_GPFS
+    /* Enable this, along with the "IBM_lockless_io" line in config.xml, if
+     * MPI accepts "bglockless:" as a file prefix.  TODO: add configure test for
+     * this. */
+    {
+        ssize_t name_len;
+        const char *base_h5_filename;
+        char h5_filename[32];
+
+        /* Check file name */
+        name_len = H5Fget_name(fid1, h5_filename, sizeof(h5_filename));
+        assert(name_len >= 0);
+        assert(name_len <= 31);
+        MESG("H5Fget_name succeed. Value Retrieved");
+        if ( verbose ) {
+            printf("\n\n--------------------------------------------------\n");
+            printf("Testing filename manipulation for IBM_lockless_io\n");
+            printf("--------------------------------------------------\n");
+            printf("Retrieved filename=\"%s\"\n", h5_filename);
+        }
+
+        /* Retrieve base name for h5_filename */
+        if(NULL == (base_h5_filename = strrchr(h5_filename, '/')))
+            base_h5_filename = h5_filename;
+        else
+            base_h5_filename++;
+
+        if(!strcmp(base_filename, "ParaEg2.h5")) {
+            if(!strncmp(h5_filename, "bglockless:", 11)) {
+                if(verbose)
+                    printf("PASSED: \"bglockless:\" prefix test\n");
+            }
+            else {
+                ret = FAIL;
+                nerrors++;
+                printf("FAILED: \"bglockless:\" prefix test\n");
+                printf("base_h5_filename = \"%s\", expected prefix \"bglockless:%s\"\n", h5_filename);
+            }
+            if(!strcmp(base_h5_filename, base_filename)) {
+                if(verbose)
+                    printf("PASSED: Filename test\n");
+            }
+            else {
+                ret = FAIL;
+                nerrors++;
+                printf("FAILED: \"bglockless:\" prefix test\n");
+                printf("base_h5_filename = \"%s\", expected \"%s\"\n", base_h5_filename, base_filename);
+            }
+        }
+        else {
+            if(!strcmp(base_h5_filename, base_filename)) {
+                if(verbose)
+                    printf("PASSED: Filename test\n");
+            }
+            else {
+                ret = FAIL;
+                nerrors++;
+                printf("FAILED: \"bglockless:\" prefix test\n");
+                printf("base_h5_filename = \"%s\", expected \"%s\"\n", base_h5_filename, base_filename);
+            }
+        }
+        assert(ret != FAIL);
+    }
+#endif
+
+
+    /* end of H5Tuner tests
+       --------------------------------------- */
+
+
+    /* Release file-access templates */
     ret=H5Pclose(acc_tpl1);
+    assert(ret != FAIL);
+    ret=H5Pclose(acc_tpl2);
     assert(ret != FAIL);
 
 
@@ -1584,11 +1858,12 @@ main(int argc, char **argv)
         test_split_comm_access(testfiles);
         MPI_BANNER("testing PHDF5 dataset collective write...");
         for(i = 0; i < n; i++)
-        phdf5writeAll(testfiles[i]);
+            phdf5writeAll(testfiles[i]);
     }
     if(doread) {
         MPI_BANNER("testing PHDF5 dataset collective read...");
-        phdf5readAll(testfiles[1]);
+        for(i = 0; i < n; i++)
+            phdf5readAll(testfiles[i]);
     }
 
     if (!(dowrite || doread)){

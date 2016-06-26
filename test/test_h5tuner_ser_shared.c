@@ -363,7 +363,7 @@ hdf5writeAll(char *filename)
         printf("\n\n--------------------------------------------------\n");
         printf("Testing values for Threshold\n");
         printf("--------------------------------------------------\n");
-        printf("Test value set to:88 \nRetrieved Threshold=%lu\n", alignment[0]);
+        printf("Test value set to:88 \nRetrieved Threshold=%llu\n", (long long unsigned)alignment[0]);
     }
     /* Check Threshold */
     if ( alignment[0] == 88 ) {
@@ -380,7 +380,7 @@ hdf5writeAll(char *filename)
         printf("\n\n--------------------------------------------------\n");
         printf("Testing values for Alignment\n");
         printf("--------------------------------------------------\n");
-        printf("Test value set to:44 \nRetrieved Alignment=%lu\n", alignment[1]);
+        printf("Test value set to:44 \nRetrieved Alignment=%llu\n", (long long unsigned)alignment[1]);
     }
     /* Check Alignment */
     if ( alignment[1] == 44 ) {
@@ -554,12 +554,17 @@ hdf5readAll(char *filename)
 {
     hid_t fid1;                 /* HDF5 file IDs */
     hid_t acc_tpl1;             /* File access templates */
-    hid_t dcpl_id;              /* Default DCPL */
+    hid_t acc_tpl2;             /* FAPL retrieved from file */
     hid_t dataset1, dataset2;   /* Dataset ID */
     hsize_t dims1[SPACE1_RANK] =
         {SPACE1_DIM1,SPACE1_DIM2}; /* dataspace dim sizes */
     DATATYPE data_array1[SPACE1_DIM1][SPACE1_DIM2]; /* data buffer */
     DATATYPE data_origin1[SPACE1_DIM1][SPACE1_DIM2]; /* expected data buffer */
+
+    /* in support of H5Tuner Test */
+    char *libtuner_file = getenv("LD_PRELOAD");
+    hsize_t alignment[2];
+    size_t sieve_buf_size;
 
     const char *base_filename;
 
@@ -587,8 +592,122 @@ hdf5readAll(char *filename)
     assert(fid1 != FAIL);
     MESG("H5Fopen succeed");
 
-    /* Release file-access template */
+    /* ------------------------------------------------
+       H5Tuner tests
+       ------------------------------------------------ */
+
+    /* Retrieve  parameters set via the H5Tuner */
+    printf("\n\n--------------------------------------------------\n");
+    if ( (libtuner_file != NULL) && (strlen(libtuner_file) > 1) ){
+        printf("Version of the H5Tuner loaded: \n%s\n", libtuner_file);
+    }
+    else {
+        printf("No H5Tuner currently loaded.\n");
+    }
+    printf("--------------------------------------------------\n");
+
+    /* Retrieve FAPL from file */
+    acc_tpl2 = H5Fget_access_plist(fid1);
+    assert(acc_tpl1 != FAIL);
+
+    /* Retrieve default HDF5 Threshold and Alignment */
+    ret = H5Pget_alignment(acc_tpl1, &alignment[0], &alignment[1]);
+    assert(ret != FAIL);
+
+    /* Verify default threshold and alignment */
+    if(alignment[0] != 1) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Default Threshold Test\n");
+    }
+    if(alignment[1] != 1) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Default Alignment Test\n");
+    }
+
+    /* Retrieve file HDF5 Threshold and Alignment */
+    ret = H5Pget_alignment(acc_tpl2, &alignment[0], &alignment[1]);
+    assert(ret != FAIL);
+
+    if ( verbose ) {
+        MESG("H5Pget_alignment succeed. Values Retrieved");
+        printf("\n\n--------------------------------------------------\n");
+        printf("Testing values for Threshold\n");
+        printf("--------------------------------------------------\n");
+        printf("Test value set to:88 \nRetrieved Threshold=%llu\n", (long long unsigned)alignment[0]);
+    }
+    /* Check Threshold */
+    if ( alignment[0] == 88 ) {
+        if (verbose)
+            printf("PASSED: Threshold Test\n");
+    }
+    else {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Threshold Test\n");
+    }
+    assert(ret != FAIL);
+    if ( verbose ) {
+        printf("\n\n--------------------------------------------------\n");
+        printf("Testing values for Alignment\n");
+        printf("--------------------------------------------------\n");
+        printf("Test value set to:44 \nRetrieved Alignment=%llu\n", (long long unsigned)alignment[1]);
+    }
+    /* Check Alignment */
+    if ( alignment[1] == 44 ) {
+        if (verbose)
+            printf("PASSED: Alignment Test\n");
+    }
+    else {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Alignment Test\n");
+    }
+    assert(ret != FAIL);
+
+    /* Retrieve default sieve buffer size */
+    ret = H5Pget_sieve_buf_size(acc_tpl1, &sieve_buf_size);
+    assert(ret != FAIL);
+
+    /* Verify default sieve buffer size */
+    if(sieve_buf_size != 65536) {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Default Sieve Buffer Size Test\n");
+    }
+
+    /* Retrieve file sieve buffer size */
+    ret = H5Pget_sieve_buf_size(acc_tpl2, &sieve_buf_size);
+    assert(ret != FAIL);
+    MESG("H5Pget_sieve_buf_size succeed. Value Retrieved");
+    if ( verbose ) {
+        printf("\n\n--------------------------------------------------\n");
+        printf("Testing values for Sieve Buffer Size\n");
+        printf("--------------------------------------------------\n");
+        printf("Test value set to:77 \nRetrieved Sieve Buffer Size=%lu\n", sieve_buf_size);
+    }
+
+    /* Check sieve buffer size */
+    if ( (int) sieve_buf_size == 77 ) {
+        if ( verbose )
+            printf("PASSED: Sieve Buffer Size Test\n");
+    }
+    else {
+        ret = FAIL;
+        nerrors++;
+        printf("FAILED: Sieve Buffer Size Test\n");
+    }
+    assert(ret != FAIL);
+
+    /* end of H5Tuner tests
+       --------------------------------------- */
+
+
+    /* Release file-access templates */
     ret=H5Pclose(acc_tpl1);
+    assert(ret != FAIL);
+    ret=H5Pclose(acc_tpl2);
     assert(ret != FAIL);
 
 
@@ -791,11 +910,12 @@ main(int argc, char **argv)
     if(dowrite) {
         printf("testing HDF5 dataset write...\n");
         for(i = 0; i < n; i++)
-        hdf5writeAll(testfiles[i]);
+            hdf5writeAll(testfiles[i]);
     }
     if(doread) {
         printf("testing HDF5 dataset read...\n");
-        hdf5readAll(testfiles[1]);
+        for(i = 0; i < n; i++)
+            hdf5readAll(testfiles[i]);
     }
 
     if (!(dowrite || doread)){
