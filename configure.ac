@@ -51,39 +51,12 @@ AC_PREFIX_DEFAULT([`pwd`/h5tuner])
 
 AC_PROG_CC
 
-## H5_CFLAGS (and company) are used by HDF5 for flags not exported to h5cc.
-## That's not necessary here, but using them will allow copying the config
-## files from HDF5 without modification.
-AC_SUBST([H5_CFLAGS])
-AC_SUBST([H5_CPPFLAGS])
-AC_SUBST([H5_LDFLAGS])
-
 ## AM_CFLAGS (and company) are for CFLAGS that should be used on h5tuner
-AC_SUBST([AM_CFLAGS])
 AC_SUBST([AM_CFLAGS_SHARED])
-AC_SUBST([AM_LDFLAGS])
 AC_SUBST([AM_LDFLAGS_SHARED])
 AC_SUBST([AM_ADDFLAGS])
 AC_SUBST([AM_ADDFLAGS_SHARED])
 AC_SUBST([AM_LIBS])
-AC_SUBST([AM_MXML_LIB])
-AC_SUBST([AM_HDF5_LIB])
-AC_SUBST([AM_MPI_LIB])
-
-## Make sure flags are initialized.
-AM_CFLAGS="${AM_CFLAGS}"
-AM_CPPFLAGS="${AM_CPPFLAGS}"
-AM_LDFLAGS="${AM_LDFLAGS}"
-CFLAGS="${CFLAGS}"
-CPPFLAGS="${CPPFLAGS}"
-LDFLAGS="${LDFLAGS}"
-
-## Configure may need to alter any of the *FLAGS variables in order for
-## various checks to work correctly. Save the user's value here so it
-## can be restored once all configure checks are complete.
-saved_user_CFLAGS="$CFLAGS"
-saved_user_FCFLAGS="$FCFLAGS"
-saved_user_CPPFLAGS="$CPPFLAGS"
 
 
 ## Detect OS from shell
@@ -106,42 +79,11 @@ AC_MSG_RESULT([done])
 
 ## set some flag values.  These may be moved to platform specific config
 ## files later.
-AM_CFLAGS="-I . -I${MPIROOT}/include -I${MXMLROOT}/include -I${HDF5ROOT}/include"
-AM_CFLAGS_SHARED="-I . -I${MPIROOT}/include -I${MXMLROOT}/include -I${HDF5ROOT}/include -g -shared -fpic -DPIC"
-AM_LDFLAGS=
+AM_CFLAGS_SHARED="-g -shared -fpic -DPIC"
 AM_LDFLAGS_SHARED=-ldl
-
-AM_MXML_LIB="-L${MXMLROOT}/lib/ -lmxml"
-AM_HDF5_LIB="-L${HDF5ROOT}/lib -lhdf5"
-AM_MPI_LIB="-L${MPIROOT}/lib -lmpich"
-
 AM_ADDFLAGS=-DDEBUG
 AM_ADDFLAGS_SHARED=-DDEBUG
 
-
-
-## ----------------------------------------------------------------------
-## Some platforms have broken basename, and/or xargs programs. Check
-## that it actually does what it's supposed to do. Catch this early
-## since configure and scripts relies upon them heavily and there's
-## no use continuing if it's broken.
-##
-AC_MSG_CHECKING([if basename works])
-BASENAME_TEST="`basename /foo/bar/baz/qux/basename_works`"
-if test $BASENAME_TEST != "basename_works"; then
-  AC_MSG_ERROR([basename program doesn't work])
-else
-  AC_MSG_RESULT([yes])
-fi
-
-## xargs basename used in configure to get the CC_BASENAME value
-AC_MSG_CHECKING([if xargs works])
-XARGS_TEST="`echo /foo/bar/baz/qux/xargs_works | xargs basename`"
-if test $XARGS_TEST != "xargs_works"; then
-  AC_MSG_ERROR([xargs program doesn't work])
-else
-  AC_MSG_RESULT([yes])
-fi
 
 ## ----------------------------------------------------------------------
 ## Check that the cache file was build on the same host as what we're
@@ -230,64 +172,6 @@ while test -n "$hname"; do
 done
 
 ## ----------------------------------------------------------------------
-## Determine build mode (debug, production, clean).
-## This has to be done early since the build mode is referred to
-## frequently.
-##
-AC_MSG_CHECKING([build mode])
-AC_ARG_ENABLE([build-mode],
-              [AS_HELP_STRING([--enable-build-mode=(debug|production|clean)],
-                              [Sets the build mode. Debug turns on symbols, API
-                               tracing, asserts, and debug optimization,
-                               as well as several other minor configure options
-                               that aid in debugging.
-                               Production turns high optimizations on.
-                               Clean turns nothing on and disables optimization
-                               (i.e.: a 'clean slate' configuration).
-                               All these settings can be overridden by using
-                               specific configure flags.
-                               [default=clean]
-                               ])],
-              [BUILD_MODE=$enableval])
-
-## Set the default
-## Depends on branch, set via script at branch creation time
-if test "X-$BUILD_MODE" = X- ; then
-    BUILD_MODE=clean
-fi
-
-## Allow this variable to be substituted in
-## other files (src/libhdf5.settings.in, etc.)
-AC_SUBST([BUILD_MODE])
-
-case "X-$BUILD_MODE" in
-  X-clean)
-    AC_MSG_RESULT([clean])
-    ;;
-  X-debug)
-    AC_DEFINE([DEBUG_BUILD], [1], [Define if this is a debug build.])
-    H5_CFLAGS="$H5_CFLAGS $DEBUG_CFLAGS"
-    H5_CPPFLAGS="$H5_CPPFLAGS $DEBUG_CPPFLAGS"
-    AC_MSG_RESULT([debug])
-    ;;
-  X-production)
-    H5_CFLAGS="$H5_CFLAGS $PROD_CFLAGS"
-    H5_CPPFLAGS="$H5_CPPFLAGS $PROD_CPPFLAGS"
-    AC_MSG_RESULT([production])
-    ;;
-  *)
-    AC_MSG_ERROR([Unrecognized build mode: $BUILD_MODE. Use debug, production, or clean.])
-esac
-
-## ----------------------------------------------------------------------
-## Some built-in configure checks can only see CFLAGS (not AM_CFLAGS), so
-## we need to add this in so configure works as intended. We will need to
-## reset this value at the end of configure, to preserve the user's settings.
-CFLAGS="${AM_CFLAGS} ${CFLAGS}"
-CPPFLAGS="${AM_CPPFLAGS} ${CPPFLAGS}"
-LDFLAGS="${AM_LDFLAGS} ${LDFLAGS}"
-
-## ----------------------------------------------------------------------
 ## Enable dependency tracking unless the configure options or a
 ## site-specific file told us not to.  This prevents configure from
 ## silently disabling dependencies for some compilers.
@@ -302,14 +186,139 @@ fi
 AC_PROG_CC
 CC_BASENAME="`echo $CC | cut -f1 -d' ' | xargs basename 2>/dev/null`"
 
-## Need to add the AM_ and H5_ into CFLAGS/CPPFLAGS to make them visible
-## for configure checks.
-## Note: Both will be restored by the end of configure.
-CPPFLAGS="$H5_CPPFLAGS $AM_CPPFLAGS $CPPFLAGS"
-CFLAGS="$H5_CFLAGS $AM_CFLAGS $CFLAGS"
-
 ## Checkpoint the cache
 AC_CACHE_SAVE
+
+## Include the current directory
+CPPFLAGS="$CPPFLAGS -I ."
+
+# ----------------------------------------------------------------------
+# Check for HDF5
+AC_ARG_WITH([hdf5],
+            [AC_HELP_STRING([--with-hdf5=DIR],
+                            [Use hdf5 library [default=yes]])],,
+            [withval=yes])
+
+case "$withval" in
+  yes)
+    HAVE_HDF5="yes"
+    AC_CHECK_HEADERS([hdf5.h],, [unset HAVE_HDF5])
+    AC_CHECK_LIB([hdf5], [H5open],, [unset HAVE_HDF5])
+
+    if test -z "$HAVE_HDF5"; then
+      AC_MSG_ERROR([could not find hdf5 library])
+    fi
+    ;;
+  no)
+    AC_MSG_ERROR([hdf5 library required to build H5Tuner])
+    ;;
+  *)
+    HAVE_HDF5="yes"
+    case "$withval" in
+      *,*)
+        hdf5_inc="`echo $withval | cut -f1 -d,`"
+        hdf5_lib="`echo $withval | cut -f2 -d, -s`"
+        ;;
+      *)
+        if test -n "$withval"; then
+          hdf5_inc="$withval/include"
+          hdf5_lib="$withval/lib"
+        fi
+        ;;
+    esac
+
+    ## Trying to include -I/usr/include and -L/usr/lib is redundant and
+    ## can mess some compilers up.
+    if test "X$hdf5_inc" = "X/usr/include"; then
+      hdf5_inc=""
+    fi
+    if test "X$hdf5_lib" = "X/usr/lib"; then
+      hdf5_lib=""
+    fi
+
+    if test -n "$hdf5_inc"; then
+      CPPFLAGS="$CPPFLAGS -I$hdf5_inc"
+    fi
+
+    AC_CHECK_HEADERS([hdf5.h],, [unset HAVE_HDF5])
+
+    if test -n "$hdf5_lib"; then
+      LDFLAGS="$LDFLAGS -L$hdf5_lib"
+      AM_LDFLAGS_SHARED="$AM_LDFLAGS_SHARED -L$hdf5_lib"
+    fi
+
+    AC_CHECK_LIB([hdf5], [H5open],, [unset HAVE_HDF5])
+
+    if test -z "$HAVE_HDF5"; then
+      AC_MSG_ERROR([could not find hdf5 library])
+    fi
+    ;;
+esac
+
+
+# ----------------------------------------------------------------------
+# Check for MXML
+AC_ARG_WITH([mxml],
+            [AC_HELP_STRING([--with-mxml=DIR],
+                            [Use mxml library [default=yes]])],,
+            [withval=yes])
+
+case "$withval" in
+  yes)
+    HAVE_MXML="yes"
+    AC_CHECK_HEADERS([mxml.h],, [unset HAVE_MXML])
+    AC_CHECK_LIB([mxml], [mxmlLoadFile],, [unset HAVE_MXML])
+
+    if test -z "$HAVE_MXML"; then
+      AC_MSG_ERROR([could not find mxml library])
+    fi
+    ;;
+  no)
+    AC_MSG_ERROR([mxml library required to build H5Tuner])
+    ;;
+  *)
+    HAVE_MXML="yes"
+    case "$withval" in
+      *,*)
+        mxml_inc="`echo $withval | cut -f1 -d,`"
+        mxml_lib="`echo $withval | cut -f2 -d, -s`"
+        ;;
+      *)
+        if test -n "$withval"; then
+          mxml_inc="$withval/include"
+          mxml_lib="$withval/lib"
+        fi
+        ;;
+    esac
+
+    ## Trying to include -I/usr/include and -L/usr/lib is redundant and
+    ## can mess some compilers up.
+    if test "X$mxml_inc" = "X/usr/include"; then
+      mxml_inc=""
+    fi
+    if test "X$mxml_lib" = "X/usr/lib"; then
+      mxml_lib=""
+    fi
+
+    if test -n "$mxml_inc"; then
+      CPPFLAGS="$CPPFLAGS -I$mxml_inc"
+    fi
+
+    AC_CHECK_HEADERS([mxml.h],, [unset HAVE_MXML])
+
+    if test -n "$mxml_lib"; then
+      LDFLAGS="$LDFLAGS -L$mxml_lib"
+      AM_LDFLAGS_SHARED="$AM_LDFLAGS_SHARED -L$mxml_lib"
+    fi
+
+    AC_CHECK_LIB([mxml], [mxmlLoadFile],, [unset HAVE_MXML])
+
+    if test -z "$HAVE_MXML"; then
+      AC_MSG_ERROR([could not find mxml library])
+    fi
+    ;;
+esac
+
 
 ##    RUNSERIAL            -- This is a command which will be prepended to
 ##               the executable name to run the executable using
@@ -342,224 +351,6 @@ AC_SUBST([RUNPARALLEL])
 LT_INIT([dlopen])
 
 
-## ----------------------------------------------------------------------
-## Check if the compiler should include symbols
-##
-AC_MSG_CHECKING([enable debugging symbols])
-AC_ARG_ENABLE([symbols],
-              [AS_HELP_STRING([--enable-symbols=(yes|no|<custom>)],
-                              [Add debug symbols to the library (e.g.: build with -g).
-                               This is independent of the build mode and optimization
-                               level. The custom string allows special settings like
-                               -ggdb, etc. to be used.
-                               [default=yes if debug build, otherwise no]
-                               ])],
-              [SYMBOLS=$enableval])
-
-## Set default
-if test "X-$SYMBOLS" = X- ; then
-  if test "X-$BUILD_MODE" = "X-debug" ; then
-    SYMBOLS=yes
-  else
-    SYMBOLS=no
-  fi
-fi
-
-## Allow this variable to be substituted in
-## other files (src/libhdf5.settings.in, etc.)
-AC_SUBST([SYMBOLS])
-
-case "X-$SYMBOLS" in
-  X-yes)
-    H5_CFLAGS="$H5_CFLAGS $SYMBOLS_CFLAGS"
-    AC_MSG_RESULT([yes])
-    ;;
-  X-no)
-    H5_CFLAGS="$H5_CFLAGS $NO_SYMBOLS_CFLAGS"
-    AC_MSG_RESULT([no])
-    ;;
-  *)
-    H5_CFLAGS="$H5_CFLAGS $SYMBOLS"
-    SYMBOLS="custom ($SYMBOLS)"
-    AC_MSG_RESULT([$SYMBOLS])
-    ;;
-esac
-
-## ----------------------------------------------------------------------
-## Check if the assert macro should be enabled
-##
-AC_MSG_CHECKING([enable asserts])
-AC_ARG_ENABLE([asserts],
-              [AS_HELP_STRING([--enable-asserts],
-                              [Determines whether NDEBUG is defined or not, which
-                               controls assertions.
-                               This is independent of the build mode and presence
-                               of debugging symbols.
-                               [default=yes if debug build, otherwise no]
-                               ])],
-              [ASSERTS=$enableval])
-
-## Set default
-if test "X-$ASSERTS" = X- ; then
-  if test "X-$BUILD_MODE" = "X-debug" ; then
-    ASSERTS=yes
-  else
-    ASSERTS=no
-  fi
-fi
-
-## Allow this variable to be substituted in
-## other files (src/libhdf5.settings.in, etc.)
-AC_SUBST([ASSERTS])
-
-case "X-$ASSERTS" in
-  X-yes)
-    H5_CPPFLAGS="$H5_CPPFLAGS -UNDEBUG"
-    AC_MSG_RESULT([yes])
-    ;;
-  X-no)
-    H5_CPPFLAGS="$H5_CPPFLAGS -DNDEBUG"
-    AC_MSG_RESULT([no])
-    ;;
-  *)
-    AC_MSG_ERROR([Unrecognized value: $ASSERTS])
-    ;;
-esac
-
-## ----------------------------------------------------------------------
-## Check if the compiler should use profiling flags/settings
-##
-AC_MSG_CHECKING([profiling])
-AC_ARG_ENABLE([profiling],
-              [AS_HELP_STRING([--enable-profiling=(yes|no|<custom>)],
-                              [Enable profiling flags (e.g.: -pg).
-                               This can be set independently from the build mode.
-                               The custom setting can be used to pass alternative
-                               profiling flags (e.g.: -P for using Prof with gcc).
-                               [default=no]
-                               ])],
-              [PROFILING=$enableval])
-
-## Default is no profiling
-if test "X-$PROFILING" = X- ; then
-    PROFILING=no
-fi
-
-## Allow this variable to be substituted in
-## other files (src/libhdf5.settings.in, etc.)
-AC_SUBST([PROFILING])
-
-case "X-$PROFILING" in
-  X-yes)
-    H5_CFLAGS="$H5_CFLAGS $PROFILE_CFLAGS"
-    AC_MSG_RESULT([yes])
-    ;;
-  X-no)
-    AC_MSG_RESULT([no])
-    ;;
-  *)
-    H5_CFLAGS="$H5_CFLAGS $PROFILING"
-    PROFILING="custom ($PROFILING)"
-    AC_MSG_RESULT([$PROFILING])
-    ;;
-esac
-
-## ----------------------------------------------------------------------
-## Check if the compiler should use a particular optimization setting
-##
-AC_MSG_CHECKING([optimization level])
-AC_ARG_ENABLE([optimization],
-              [AS_HELP_STRING([--enable-optimization=(high|debug|none|<custom>)],
-                              [Enable optimization flags/settings (e.g.: -O3).
-                               This can be set independently from the build mode.
-                               Optimizations for a given compiler can be specified
-                               at several levels: High, with aggressive optimizations
-                               turned on; debug, with optimizations that are
-                               unlikely to interfere with debugging or profiling;
-                               and none, with no optimizations at all.
-                               See the compiler-specific config/*-flags file for more
-                               details.
-                               Alternatively, optimization options can
-                               be specified directly by specifying them as a
-                               string value. These custom optimzation flags will
-                               completely replace all other optimization flags.
-                               [default depends on build mode: debug=debug,
-                                production=high, clean=none]
-                               ])],
-              [OPTIMIZATION=$enableval])
-
-## Set the default optimization level. This depends on the compiler mode.
-if test "X-$OPTIMIZATION" = X- ; then
-  case "X-$BUILD_MODE" in
-  X-debug)
-    OPTIMIZATION=debug
-    ;;
-  X-production)
-    OPTIMIZATION=high
-    ;;
-  X-clean)
-    OPTIMIZATION=none
-    ;;
-  esac
-fi
-
-## Allow this variable to be substituted in
-## other files (src/libhdf5.settings.in, etc.)
-AC_SUBST([OPTIMIZATION])
-
-case "X-$OPTIMIZATION" in
-  X-high)
-    H5_CFLAGS="$H5_CFLAGS $HIGH_OPT_CFLAGS"
-    AC_MSG_RESULT([high])
-    ;;
-  X-debug)
-    H5_CFLAGS="$H5_CFLAGS $DEBUG_OPT_CFLAGS"
-    AC_MSG_RESULT([debug])
-    ;;
-  X-none)
-    H5_CFLAGS="$H5_CFLAGS $NO_OPT_CFLAGS"
-    AC_MSG_RESULT([none])
-    ;;
-  *)
-    H5_CFLAGS="$H5_CFLAGS $OPTIMIZATION"
-    OPTIMIZATION="custom ($OPTIMIZATION)"
-    AC_MSG_RESULT([$OPTIMIZATION])
-    ;;
-esac
-
-## Check if they would like the function stack support compiled in
-##
-AC_MSG_CHECKING([whether function stack tracking is enabled])
-AC_ARG_ENABLE([codestack],
-              [AS_HELP_STRING([--enable-codestack],
-                              [Enable the function stack tracing (for developer debugging).
-                               [default=no]
-                              ])],
-              [CODESTACK=$enableval])
-
-## Set the default level.
-if test "X-$CODESTACK" = X- ; then
-  CODESTACK=no
-fi
-
-## Allow this variable to be substituted in
-## other files (src/libhdf5.settings.in, etc.)
-AC_SUBST([CODESTACK])
-
-case "X-$CODESTACK" in
-  X-yes)
-      AC_MSG_RESULT([yes])
-      AC_DEFINE([HAVE_CODESTACK], [1],
-                [Define if the function stack tracing code is to be compiled in])
-    ;;
-  X-no)
-      AC_MSG_RESULT([no])
-    ;;
-  *)
-      AC_MSG_ERROR([Unrecognized value: $CODESTACK])
-    ;;
-esac
-
 ## Checkpoint the cache
 AC_CACHE_SAVE
 
@@ -590,12 +381,6 @@ if test "X$RUNPARALLEL" = "Xnone"; then
   RUNPARALLEL=""
 fi
 
-
-## ----------------------------------------------------------------------
-## Restore user's CFLAGS.
-CFLAGS="$saved_user_CFLAGS"
-CPPFLAGS="$saved_user_CPPFLAGS"
-LDFLAGS="$saved_user_LDFLAGS"
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
