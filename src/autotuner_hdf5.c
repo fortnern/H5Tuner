@@ -33,6 +33,10 @@
 /* Global to indicate verbose output */
 int verbose_g;
 
+/* Globla to keep track of whether we've printed the message saying we entered
+ * the library */
+int library_message_g = 0;
+
 
 /* MSC - Needs a test */
 herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const char *filename, /* OUT */ char **new_filename)
@@ -58,7 +62,7 @@ herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const c
             /* Check if this parameter applies to this file */
             if(!node_file_name || !strcmp(file_basename, node_file_name)) {
                 if(!strcmp(node->child->value.text.string, "true")) {
-                    if(verbose_g >= 3) {
+                    if(verbose_g >= 4) {
                         printf("    Setting GPFS paramenter %s: %s for %s\n", parameter_name, node->child->value.text.string, filename);
                     }
 
@@ -104,7 +108,7 @@ herr_t set_mpi_parameter(mxml_node_t *tree, const char *parameter_name, const ch
 
         /* Check if this parameter applies to this file */
         if(!node_file_name || !strcmp(file_basename, node_file_name)) {
-            if(verbose_g >= 3) {
+            if(verbose_g >= 4) {
                 printf("    Setting MPI paramenter %s: %s for %s\n", parameter_name, node->child->value.text.string, filename);
             }
 
@@ -143,9 +147,6 @@ hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const ch
 
         /* Check if this parameter applies to this file */
         if(!node_file_name || !strcmp(file_basename, node_file_name))  {
-#ifdef DEBUG
-            /* printf("H5Tuner: setting %s: %s\n", parameter_name, node->child->value.text.string); */
-#endif
             if(!strcmp(parameter_name, "sieve_buf_size")) {
                 long long sieve_size;
 
@@ -156,7 +157,7 @@ hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const ch
                 if(sieve_size < 0)
                     ERROR("Invalid value for sieve buffer size");
 
-                if(verbose_g >= 3) {
+                if(verbose_g >= 4) {
                     printf("    Setting sieve buffer size: %lld for %s\n", sieve_size, filename);
                 }
 
@@ -193,7 +194,7 @@ hid_t set_fapl_parameter(mxml_node_t *tree, const char *parameter_name, const ch
                 if(alignment < 0)
                     ERROR("Invalid value for alignment");
 
-                if(verbose_g >= 3) {
+                if(verbose_g >= 4) {
                     printf("    Setting threshold: %lld, alignment: %lld for %s\n", threshold, alignment, filename);
                 }
 
@@ -257,11 +258,6 @@ herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const c
                         ERROR("Unable to allocate array of dimensions");
                     if(H5Sget_simple_extent_dims(space_id, dims, NULL) < 0)
                         ERROR("Unable to get space dimensions");
-#ifdef DEBUG
-    /* printf("dims[0] = %d, ndims = %d\n", dims[0], ndims);
-    printf("dims[1] = %d, ndims = %d\n", dims[1], ndims);
-    printf("dims[2] = %d, ndims = %d\n", dims[2], ndims); */
-#endif
 
                     if(NULL == (chunk_arr = (hsize_t *)malloc(sizeof(hsize_t) * ndims)))
                         ERROR("Unable to allocate array of chunk dimensions");
@@ -286,7 +282,7 @@ herr_t set_dcpl_parameter(mxml_node_t *tree, const char *parameter_name, const c
                         chunk_arr[i] = (hsize_t)chunk_dim_ll;
                     }
 
-                    if(verbose_g >= 3) {
+                    if(verbose_g >= 4) {
                         printf("    Setting chunk size: {");
                         for(i = 0; i < ndims; i++) {
                             printf("%llu", (long long unsigned)chunk_arr[i]);
@@ -353,9 +349,15 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
 
     set_verbose();
 
-    if(verbose_g) {
+    if(!library_message_g) {
+        if(verbose_g)
+            printf("H5Tuner library loaded\n");
+        library_message_g = 1;
+    }
+
+    if(verbose_g >= 2) {
         printf("Entering H5Tuner/H5Fcreate()\n");
-        if(verbose_g >= 2)
+        if(verbose_g >= 3)
             printf("  Loading parameters file: %s\n", config_file ? config_file : "config.xml");
     }
 
@@ -376,9 +378,6 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
         ERROR("Unable to get file driver");
 
     if(driver == H5FD_MPIO) {
-    #ifdef DEBUG
-          /* printf("Driver is H5FD_MPIO\n"); */
-        #endif
         if(H5Pget_fapl_mpio(real_fapl_id, &new_comm, &new_info) < 0)
             ERROR("Unable to get MPIO file driver info");
 
@@ -432,9 +431,6 @@ hid_t DECL(H5Fcreate)(const char *filename, unsigned flags, hid_t fcpl_id, hid_t
     }
 #endif
 
-#ifdef DEBUG
-      /* printf("\nH5Tuner: calling H5Fcreate.\n"); */
-#endif
     ret_value = __fake_H5Fcreate(new_filename ? new_filename : filename, flags, fcpl_id, real_fapl_id);
 
 done:
@@ -474,9 +470,15 @@ hid_t DECL(H5Fopen)(const char *filename, unsigned flags, hid_t fapl_id)
 
     set_verbose();
 
-    if(verbose_g) {
+    if(!library_message_g) {
+        if(verbose_g)
+            printf("H5Tuner library loaded\n");
+        library_message_g = 1;
+    }
+
+    if(verbose_g >= 2) {
         printf("Entering H5Tuner/H5Fopen()\n");
-        if(verbose_g >= 2)
+        if(verbose_g >= 3)
             printf("  Loading parameters file: %s\n", config_file ? config_file : "config.xml");
     }
 
@@ -497,9 +499,6 @@ hid_t DECL(H5Fopen)(const char *filename, unsigned flags, hid_t fapl_id)
         ERROR("Unable to get file driver");
 
     if(driver == H5FD_MPIO) {
-    #ifdef DEBUG
-          /* printf("Driver is H5FD_MPIO\n"); */
-        #endif
         if(H5Pget_fapl_mpio(real_fapl_id, &new_comm, &new_info) < 0)
             ERROR("Unable to get MPIO file driver info");
 
@@ -548,9 +547,6 @@ hid_t DECL(H5Fopen)(const char *filename, unsigned flags, hid_t fapl_id)
     }
 #endif
 
-#ifdef DEBUG
-      /* printf("\nH5Tuner: calling H5Fopen.\n"); */
-#endif
     ret_value = __fake_H5Fopen(new_filename ? new_filename : filename, flags, real_fapl_id);
 
 done:
@@ -580,7 +576,13 @@ herr_t DECL(H5Dwrite)(hid_t dataset_id, hid_t mem_type_id, hid_t mem_space_id, h
 
     set_verbose();
 
-    if(verbose_g)
+    if(!library_message_g) {
+        if(verbose_g)
+            printf("H5Tuner library loaded\n");
+        library_message_g = 1;
+    }
+
+    if(verbose_g >= 2)
         printf("Entering H5Tuner/H5Dwrite()\n");
 
 #ifdef DEBUG
@@ -591,9 +593,6 @@ herr_t DECL(H5Dwrite)(hid_t dataset_id, hid_t mem_type_id, hid_t mem_space_id, h
       printf("xfer_plist_id: %d\n", xfer_plist_id); */
 #endif
 
-#ifdef DEBUG
-      /* printf("\nH5Tuner: calling H5Dwrite.\n"); */
-#endif
     ret = __fake_H5Dwrite(dataset_id, mem_type_id, mem_space_id, file_space_id, xfer_plist_id, buf);
 
     return ret;
@@ -610,7 +609,7 @@ hid_t prepare_dcpl(hid_t loc_id, const char *name, hid_t space_id, hid_t dcpl_id
     hid_t copied_dcpl_id = -1;
     hid_t ret_value = -1;
 
-    if(verbose_g >= 2)
+    if(verbose_g >= 3)
         printf("  Loading parameters file: %s\n", config_file ? config_file : "config.xml");
 
     if(NULL == (fp = fopen(config_file ? config_file : "config.xml", "r")))
@@ -662,20 +661,18 @@ hid_t DECL(H5Dcreate1)(hid_t loc_id, const char *name, hid_t type_id, hid_t spac
 
     set_verbose();
 
-    if(verbose_g)
-        printf("Entering H5Tuner/H5Dcreate1()\n");
+    if(!library_message_g) {
+        if(verbose_g)
+            printf("H5Tuner library loaded\n");
+        library_message_g = 1;
+    }
 
-#ifdef DEBUG
-      /* printf("\nH5Tuner: Loading parameters file for H5Dcreate1: %s\n", file_path); */
-#endif
+    if(verbose_g >= 2)
+        printf("Entering H5Tuner/H5Dcreate1()\n");
 
     /* Get real DCPL */
     if((real_dcpl_id = prepare_dcpl(loc_id, name, space_id, dcpl_id)) < 0)
         ERROR("Unable to obtain real DCPL");
-
-#ifdef DEBUG
-      /* printf("\nH5Tuner: calling H5Dcreate1.\n"); */
-  #endif
 
     ret_value = __fake_H5Dcreate1(loc_id, name, type_id, space_id, real_dcpl_id);
 
@@ -695,20 +692,18 @@ hid_t DECL(H5Dcreate2)(hid_t loc_id, const char *name, hid_t dtype_id, hid_t spa
 
     set_verbose();
 
-    if(verbose_g)
-        printf("Entering H5Tuner/H5Dcreate2()\n");
+    if(!library_message_g) {
+        if(verbose_g)
+            printf("H5Tuner library loaded\n");
+        library_message_g = 1;
+    }
 
-#ifdef DEBUG
-      /* printf("\nH5Tuner: Loading parameters file for H5Dcreate2: %s\n", file_path); */
-#endif
+    if(verbose_g >= 2)
+        printf("Entering H5Tuner/H5Dcreate2()\n");
 
     /* Get real DCPL */
     if((real_dcpl_id = prepare_dcpl(loc_id, name, space_id, dcpl_id)) < 0)
         ERROR("Unable to obtain real DCPL");
-
-#ifdef DEBUG
-      /* printf("\nH5Tuner: calling H5Dcreate2.\n"); */
- #endif
 
     ret_value = __fake_H5Dcreate2(loc_id, name, dtype_id, space_id, lcpl_id, real_dcpl_id, dapl_id);
 
