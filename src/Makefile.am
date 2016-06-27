@@ -7,23 +7,29 @@ lib_LTLIBRARIES=libautotuner.la
 #
 libautotuner_la_SOURCES = autotuner_hdf5_static.c autotuner_hdf5.c autotuner_private.h
 
-all: ../lib/libautotuner_static.a ../lib/libautotuner.so
+all: libautotuner_static.a libautotuner.so
 
-../lib/autotuner_hdf5_static.o: autotuner_hdf5_static.c autotuner.h autotuner_private.h
+autotuner_hdf5_static.o: autotuner_hdf5_static.c autotuner.h autotuner_private.h
 				$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@ $) @AM_ADDFLAGS@
 
-../lib/autotuner_hdf5.po: autotuner_hdf5.c autotuner.h autotuner_private.h
+autotuner_hdf5.po: autotuner_hdf5.c autotuner.h autotuner_private.h
 				$(CC) $(CPPFLAGS) $(CFLAGS_SHARED) @AM_CFLAGS_SHARED@	$(LDFLAGS_SHARED) @AM_LDFLAGS_SHARED@ -c $< -o $@ @AM_ADDFLAGS_SHARED@
 
-../lib/libautotuner_static.a: ../lib/autotuner_hdf5_static.o
+libautotuner_static.a: autotuner_hdf5_static.o
 				ar rcs $@ $^
-				rm ../lib/autotuner_hdf5_static.o
 
-../lib/libautotuner.so: ../lib/autotuner_hdf5.po
+libautotuner.so: autotuner_hdf5.po
 				$(CC) $(CFLAGS_SHARED) @AM_CFLAGS_SHARED@ $(LDFLAGS_SHARED) @AM_LDFLAGS_SHARED@ -o $@ $^ $(LIBS) @AM_LIBS@ @AM_ADDFLAGS_SHARED@
-				rm ../lib/autotuner_hdf5.po
+
+install: libautotuner_static.a libautotuner.so
+				mkdir -p ${prefix}/lib
+				cp libautotuner_static.a ${prefix}/lib/libautotuner_static.a
+				cp libautotuner.so ${prefix}/lib/libautotuner.so
+
+uninstall:
+				rm -f ${prefix}/lib/libautotuner_static.a ${prefix}/lib/libautotuner.so
 
 clean:
-				rm -f *.o *.a lib/*.o lib/*.a lib/*.so lib/*.po
+				rm -f *.o *.a *.so *.po *.la *.lo
 
 include $(top_srcdir)/config/conclude.am

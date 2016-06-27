@@ -13,9 +13,9 @@ RUNEXEC=$(RUNPARALLEL)
 # tells Autoconf to look for additional Autoconf macros in the m4 subdirectory
 ACLOCAL_AMFLAGS=-I m4
 
-SUBDIRS = src test examples lib
+SUBDIRS = src test examples
 
-DIST_SUBDIRS = src test examples lib
+DIST_SUBDIRS = src test examples
 
 # directive tells Automake to place the file autogen.sh in the distribution archive - file is shipped to our users
 EXTRA_DIST = autogen.sh

@@ -386,7 +386,6 @@ AC_CONFIG_FILES([Makefile
                  src/Makefile
                  test/Makefile
                  examples/Makefile
-                 lib/Makefile
                  examples/config.xml
                  test/config.xml
                  evo/h5evolve_sample.py])
