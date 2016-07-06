@@ -20,6 +20,7 @@ import datetime
 import signal
 from shutil import move
 import re
+import optparse
 
 import pyevolve
 from pyevolve import G1DList
@@ -35,7 +36,7 @@ from pyevolve import Consts
 
 from xml.dom.minidom import Document
 
-NO_OF_PARAMS=5
+#NO_OF_PARAMS=5
 STRING_LEN=6
 NUM_ELITE=3
 NUM_POP=15
@@ -63,21 +64,25 @@ def alarm_handler(signum, frame):
 # The default value for stripe_count is 1. We are going to skip 1 and 4 because they
 # are shown to be very bad. Choosing stripe_count to be -1 means stripe over all of
 # available OSTs.
-strp_fac = [4, 8, 16, 24, 32, 48, 64, 96, 128, -1];
+strp_fac_i = None
+# strp_fac = [4, 8, 16, 24, 32, 48, 64, 96, 128, -1];
 
 # The default value for stripe_size is 1 MB. It has to be a multiple of page size(64KB).
 # A good stiripe size for seq.I/O is between 1 MB and 4 MB. The minimu is 512 KB and the
 # maximum is 4 GB.
-strp_unt = [1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728];
+strp_unt_i = None
+# strp_unt = [1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728];
 
 #######################
 # Collective Buffering
 #######################
 
 # The number of aggregators
-cb_nds = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 256];
+cb_nds_i = None
+# cb_nds = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 256];
 
-# Collective buffering buffer siz
+# Collective buffering buffer size
+cb_buf_size_i = None
 # cb_buf_size = [4194304, 8388608, 16777216, 33554432, 67108864, 134217728];
 
 #################
@@ -86,12 +91,14 @@ cb_nds = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 256];
 # HDF5 Alignment
 # NEW, NOT FOR IPDPS: alignment = [65536, 131072, 262144, 524288, 1048576, 2097152];
 #alignment = [65535, 131070, 262140, 524280, 1048560, 2097120];
-alignment = ["1, 1", "0, 4096", "0, 16384", "0, 65536", "0, 262144", "1024, 4096", "1024, 16384", "1024, 65536", "1024, 262144", "4096, 16384", "4096, 65536", "4096, 262144", "16384, 65536", "16384, 262144"]
+alignment_i = None
+#alignment = ["1, 1", "0, 4096", "0, 16384", "0, 65536", "0, 262144", "1024, 4096", "1024, 16384", "1024, 65536", "1024, 262144", "4096, 16384", "4096, 65536", "4096, 262144", "16384, 65536", "16384, 262144"]
 
 # Data Sieving buffer size
 # PRABHAT
+sieve_buf_size_i = None
 #siv_buf_size = [65535, 131070, 262140, 524280, 1048560, 2097120];
-siv_buf_size = [536870912]
+#siv_buf_size = [536870912]
 
 #####################################################################
 # Utility files used during the evolve iterations
@@ -102,6 +109,8 @@ running_time_file = open('./running_time.txt', 'w')
 perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
 def eval_func(genome):
+    global strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, run_cmd
+
     Logdir = './Logs/'
     HOME = os.environ['PWD']
     # set SCRATCH variable prior to execution evolve or use current directory
@@ -112,29 +121,7 @@ def eval_func(genome):
         SCRATCH = os.environ['PWD']
         os.environ['SCRATCH'] = SCRATCH
 
-
-    this_strp_fac = genome[0];
-    this_strp_unt = genome[1];
-    this_cb_nds = genome[2];
-    # this_cb_buf_size = genome[3]; Ruth(David's) Suggestion
-    this_cb_buf_size = genome[1];
-    #this_align = genome[4];
-    this_align_str = genome[3];
-    tmp = re.split(', ', this_align_str);
-    this_align_thresh = int(tmp[0])
-    this_align = int(tmp[1])
-
-    #this_siv_buf_size = genome[5];
-    this_siv_buf_size = genome[4];
-
-    # check to see if result's in history; if it is, use that!
-    #for line in open("result_output.txt"):
-    #   if str(this_strp_fac) + ", " + str(this_strp_unt) + ", " + str(this_cb_nds) + str(this_cb_buf_size) + ", " + str(this_align) + ", " + str(this_siv_buf_size) in line:
-    #      return float(line.split(", ")[6])
-
-    print "Evaluate Parameters config (%d, %d, %d, %d, %d, %d): " % (this_strp_fac, this_strp_unt, this_cb_nds, this_align_thresh, this_align, this_siv_buf_size)
-    #sys.stdout.flush()
-
+    
     ####################################################################
     #
     # Create the minidom document for tunable parameters
@@ -146,42 +133,76 @@ def eval_func(genome):
     params = doc.createElement("Parameters")
     doc.appendChild(params)
 
-    high = doc.createElement("High_Level_IO_Library");
+    high = doc.createElement("High_Level_IO_Library")
     params.appendChild(high)
-    algn = doc.createElement("alignment");
-    high.appendChild(algn);
-    algn_txt_tmp = str(this_align_thresh) + ',' + str(this_align);
-    algn_txt = doc.createTextNode(algn_txt_tmp);
-    algn.appendChild(algn_txt);
-
-    siv_buf = doc.createElement("sieve_buf_size");
-    high.appendChild(siv_buf);
-    siv_buf_txt = doc.createTextNode(str(this_siv_buf_size));
-    siv_buf.appendChild(siv_buf_txt);
-
     mid = doc.createElement("Middleware_Layer");
     params.appendChild(mid);
-    cb_n = doc.createElement("cb_nodes");
-    mid.appendChild(cb_n);
-    cb_n_txt = doc.createTextNode(str(this_cb_nds));
-    cb_n.appendChild(cb_n_txt);
+    low = doc.createElement("Parallel_File_System")
+    params.appendChild(low)
 
-    cb_buf = doc.createElement("cb_buffer_size");
-    mid.appendChild(cb_buf);
-    cb_buf_txt = doc.createTextNode(str(this_cb_buf_size));
-    cb_buf.appendChild(cb_buf_txt);
+    if strp_fac_i is not None:
+        this_strp_fac = genome[strp_fac_i].replace(" ", "")
+        strp_fac_obj = doc.createElement("striping_factor")
+        low.appendChild(strp_fac_obj)
+        strp_fac_txt = doc.createTextNode(this_strp_fac)
+        strp_fac_obj.appendChild(strp_fac_txt)
+    else:
+        this_strp_fac = "NA"
 
-    low = doc.createElement("Parallel_File_System");
-    params.appendChild(low);
-    strp_fac_obj = doc.createElement("striping_factor");
-    low.appendChild(strp_fac_obj);
-    strp_fac_txt = doc.createTextNode(str(this_strp_fac));
-    strp_fac_obj.appendChild(strp_fac_txt);
+    if strp_unt_i is not None:
+        this_strp_unt = genome[strp_unt_i].replace(" ", "")
+        strp_unt_obj = doc.createElement("striping_unit")
+        low.appendChild(strp_unt_obj)
+        strp_unt_txt = doc.createTextNode(this_strp_unt)
+        strp_unt_obj.appendChild(strp_unt_txt)
+    else:
+        this_strp_unt = "NA"
 
-    strp_unt_obj = doc.createElement("striping_unit");
-    low.appendChild(strp_unt_obj);
-    strp_unt_txt = doc.createTextNode(str(this_strp_unt));
-    strp_unt_obj.appendChild(strp_unt_txt);
+    if cb_nds_i is not None:
+        this_cb_nds = genome[cb_nds_i].replace(" ", "")
+        cb_n = doc.createElement("cb_nodes")
+        mid.appendChild(cb_n)
+        cb_n_txt = doc.createTextNode(this_cb_nds)
+        cb_n.appendChild(cb_n_txt)
+    else:
+        this_cb_nds = "NA"
+
+    if cb_buf_size_i is not None:
+        this_cb_buf_size = genome[cb_buf_size_i].replace(" ", "")
+        cb_buf = doc.createElement("cb_buffer_size")
+        mid.appendChild(cb_buf)
+        cb_buf_txt = doc.createTextNode(this_cb_buf_size)
+        cb_buf.appendChild(cb_buf_txt)
+    else:
+        this_cb_buf_size = "NA"
+
+    if alignment_i is not None:
+        this_align = genome[alignment_i].replace(" ", "")
+        algn = doc.createElement("alignment")
+        high.appendChild(algn)
+        algn_txt = doc.createTextNode(this_align)
+        algn.appendChild(algn_txt)
+    else:
+        this_align = "NA"
+
+    if sieve_buf_size_i is not None:
+        this_siv_buf_size = genome[sieve_buf_size_i].replace(" ", "")
+        siv_buf = doc.createElement("sieve_buf_size")
+        high.appendChild(siv_buf)
+        siv_buf_txt = doc.createTextNode(this_siv_buf_size)
+        siv_buf.appendChild(siv_buf_txt)
+    else:
+        this_siv_buf_size = "NA"
+
+    # check to see if result's in history; if it is, use that!
+    #for line in open("result_output.txt"):
+    #   if str(this_strp_fac) + ", " + str(this_strp_unt) + ", " + str(this_cb_nds) + str(this_cb_buf_size) + ", " + str(this_align) + ", " + str(this_siv_buf_size) in line:
+    #      return float(line.split(", ")[6])
+
+    str_param = this_strp_fac + ', ' + this_strp_unt + ', ' + this_cb_nds + ', ' + this_cb_buf_size + ', ' + this_align + ', ' + ', ' + this_siv_buf_size
+
+    print "Evaluate Parameters config (%s): " % (str_param)
+    #sys.stdout.flush()
 
     home_dir = os.environ['PWD'];
     file_path = home_dir + 'config.xml'
@@ -201,16 +222,6 @@ def eval_func(genome):
 
     todays_date = datetime.datetime.now()
     print todays_date
-
-    #####################################################
-    # Clean up working space
-    #####################################################
-    if "sample_dataset.h5part" in os.listdir(SCRATCH):
-        os.remove(SCRATCH + '/sample_dataset.h5part')
-    if "vorpalio.h5" in os.listdir(SCRATCH):
-        os.remove(SCRATCH + '/vorpalio.h5')
-    if "prs.h5" in os.listdir(SCRATCH):
-        os.remove(SCRATCH + '/prs.h5') 
 
     signal.signal(signal.SIGALRM, alarm_handler)
     signal.alarm(59*60)  # 59 minutes
@@ -244,7 +255,7 @@ def eval_func(genome):
             #q = subprocess.Popen(["ibrun $WORK/HDF/GCRM/gcrmio/gcrmio -r 11 -s 7 -prs -t 10 -o '/scratch/01657/bbehza2'", "-np", "128"], stdout=subprocess.PIPE, shell=True)
             #q = subprocess.Popen(["ibrun $WORK/HDF/GCRM/gcrmio/gcrmio -r 11 -s 7 -prs -t 40 -o '/scratch/01657/bbehza2'", "-np", "512"], stdout=subprocess.PIPE, shell=True)
 
-            q = subprocess.Popen(["mpiexec -n 2 $SCRATCH/ph5example"], stdout=subprocess.PIPE, shell=True)
+            q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
             out, err = q.communicate()
             print out
 
@@ -283,16 +294,14 @@ def eval_func(genome):
     print 'this_gen', this_gen
     print 'num pop',NUM_POP,'num elite',NUM_ELITE
 
-    str_result = str(this_gen) + ': ' + str(this_strp_fac) + ', ' + str(this_strp_unt) + ', ' + str(this_cb_nds) + ', ' + str(this_cb_buf_size) + ', ' + str(this_align_thresh) + ', ' + str(this_align) + ', ' + str(this_siv_buf_size) + ': ' + str(elapsed);
+    str_result = str(this_gen) + ': ' + str_param + ': ' + str(elapsed)
 
-    str_param = str(this_strp_fac) + ', ' + str(this_strp_unt) + ', ' + str(this_cb_nds) + ', ' + str(this_cb_buf_size) + ', ' + str(this_align_thresh) + ', ' + str(this_align) + ', ' + str(this_siv_buf_size);
+    config_feat_file.write(str_param)
+    config_feat_file.write('\n')
 
-    config_feat_file.write(str_param);
-    config_feat_file.write('\n');
-
-    result_output.write(str_result);
-    result_output.write('\n');
-    running_time_file.write('[' + str(todays_date) + '] ' + str_result + '=' + str(valid) + '\n');
+    result_output.write(str_result)
+    result_output.write('\n')
+    running_time_file.write('[' + str(todays_date) + '] ' + str_result + '=' + str(valid) + '\n')
 
     sys.stdout.flush()
     result_output.flush()
@@ -300,7 +309,7 @@ def eval_func(genome):
     running_time_file.flush()
     perf_feat_filenames_file.flush()
 
-    return float(elapsed);
+    return float(elapsed)
 
 def ConvergenceCriteria(ga_engine):
     best = ga_engine.bestIndividual()
@@ -313,23 +322,117 @@ def ConvergenceCriteria(ga_engine):
 def run_main():
     print "Starting main()!"
     #sys.stdout.flush()
-    global NUM_GENS, NUM_POP, NUM_ELITE, GLOB_COUNT, NO_OF_PARAMS
+    global NUM_GENS, NUM_POP, NUM_ELITE, GLOB_COUNT, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, run_cmd
 
+    # Set up parser
+    parser = optparse.OptionParser()
+
+    # Add striping factor option
+    parser.add_option("--striping_factor", action="store", dest="strp_fac_str")
+
+    # Add striping unit option
+    parser.add_option("--striping_unit", action="store", dest="strp_unt_str")
+
+    # Add collective buffering nodes option
+    parser.add_option("--cb_nodes", action="store", dest="cb_nds_str")
+
+    # Add collective buffering buffer size option
+    parser.add_option("--cb_buffer_size", action="store", dest="cb_buf_size_str")
+
+    # Add alignment option
+    parser.add_option("--alignment", action="store", dest="alignment_str")
+
+    # Add sieve buffer size option
+    parser.add_option("--sieve_buf_size", action="store", dest="sieve_buf_size_str")
+
+    # Parse options
+    opt, run_cmd = parser.parse_args()
+
+    # Keep track of index in genome
+    genome_i = 0
+
+    # Start building genome
     setOfAlleles = GAllele.GAlleles()
-    sf = GAllele.GAlleleList(strp_fac)
-    su = GAllele.GAlleleList(strp_unt)
-    cn = GAllele.GAlleleList(cb_nds)
-    # cs = GAllele.GAlleleList(cb_buf_size)
-    al = GAllele.GAlleleList(alignment)
-    sb = GAllele.GAlleleList(siv_buf_size)
-    setOfAlleles.add(sf)
-    setOfAlleles.add(su)
-    setOfAlleles.add(cn)
-    # setOfAlleles.add(cs)
-    setOfAlleles.add(al)
-    setOfAlleles.add(sb)
 
-    genome = G1DList.G1DList(NO_OF_PARAMS)
+    # Handle striping factor
+    if opt.strp_fac_str is not None:
+        # Build list for genome
+        strp_fac = opt.strp_fac_str.split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(strp_fac)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        strp_fac_i = genome_i
+        genome_i += 1
+
+    # Handle striping unit
+    if opt.strp_unt_str is not None:
+        # Build list for genome
+        strp_unt = opt.strp_unt_str.split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(strp_unt)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        strp_unt_i = genome_i
+        genome_i += 1
+
+    # Handle collective buffering nodes
+    if opt.cb_nds_str is not None:
+        # Build list for genome
+        cb_nds = opt.cb_nds_str.split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(cb_nds)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        cb_nds_i = genome_i
+        genome_i += 1
+
+    # Handle collective buffering buffer size
+    if opt.cb_buf_size_str is not None:
+        # Build list for genome
+        cb_buf_size = opt.cb_buf_size_str.split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(cb_buf_size)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        cb_buf_size_i = genome_i
+        genome_i += 1
+
+    # Handle alignment
+    if opt.alignment_str is not None:
+        # Build list for genome
+        alignment_size = opt.alignment_str.split(";")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(alignment_size)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        alignment_i = genome_i
+        genome_i += 1
+
+    # Handle sieve buffer size
+    if opt.sieve_buf_size_str is not None:
+        # Build list for genome
+        sieve_buf_size = opt.sieve_buf_size_str.split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(sieve_buf_size)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        sieve_buf_size_i = genome_i
+        genome_i += 1
+
+    genome = G1DList.G1DList(genome_i)
     genome.setParams(allele=setOfAlleles)
 
     genome.evaluator.set(eval_func)
