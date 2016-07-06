@@ -142,55 +142,61 @@ def eval_func(genome):
 
     if strp_fac_i is not None:
         this_strp_fac = genome[strp_fac_i].replace(" ", "")
-        strp_fac_obj = doc.createElement("striping_factor")
-        low.appendChild(strp_fac_obj)
-        strp_fac_txt = doc.createTextNode(this_strp_fac)
-        strp_fac_obj.appendChild(strp_fac_txt)
+        if this_strp_fac.lower() != "unset":
+            strp_fac_obj = doc.createElement("striping_factor")
+            low.appendChild(strp_fac_obj)
+            strp_fac_txt = doc.createTextNode(this_strp_fac)
+            strp_fac_obj.appendChild(strp_fac_txt)
     else:
         this_strp_fac = "NA"
 
     if strp_unt_i is not None:
         this_strp_unt = genome[strp_unt_i].replace(" ", "")
-        strp_unt_obj = doc.createElement("striping_unit")
-        low.appendChild(strp_unt_obj)
-        strp_unt_txt = doc.createTextNode(this_strp_unt)
-        strp_unt_obj.appendChild(strp_unt_txt)
+        if this_strp_unt.lower() != "unset":
+            strp_unt_obj = doc.createElement("striping_unit")
+            low.appendChild(strp_unt_obj)
+            strp_unt_txt = doc.createTextNode(this_strp_unt)
+            strp_unt_obj.appendChild(strp_unt_txt)
     else:
         this_strp_unt = "NA"
 
     if cb_nds_i is not None:
         this_cb_nds = genome[cb_nds_i].replace(" ", "")
-        cb_n = doc.createElement("cb_nodes")
-        mid.appendChild(cb_n)
-        cb_n_txt = doc.createTextNode(this_cb_nds)
-        cb_n.appendChild(cb_n_txt)
+        if this_cb_nds.lower() != "unset":
+            cb_n = doc.createElement("cb_nodes")
+            mid.appendChild(cb_n)
+            cb_n_txt = doc.createTextNode(this_cb_nds)
+            cb_n.appendChild(cb_n_txt)
     else:
         this_cb_nds = "NA"
 
     if cb_buf_size_i is not None:
         this_cb_buf_size = genome[cb_buf_size_i].replace(" ", "")
-        cb_buf = doc.createElement("cb_buffer_size")
-        mid.appendChild(cb_buf)
-        cb_buf_txt = doc.createTextNode(this_cb_buf_size)
-        cb_buf.appendChild(cb_buf_txt)
+        if this_cb_buf_size.lower() != "unset":
+            cb_buf = doc.createElement("cb_buffer_size")
+            mid.appendChild(cb_buf)
+            cb_buf_txt = doc.createTextNode(this_cb_buf_size)
+            cb_buf.appendChild(cb_buf_txt)
     else:
         this_cb_buf_size = "NA"
 
     if alignment_i is not None:
         this_align = genome[alignment_i].replace(" ", "")
-        algn = doc.createElement("alignment")
-        high.appendChild(algn)
-        algn_txt = doc.createTextNode(this_align)
-        algn.appendChild(algn_txt)
+        if this_align.lower() != "unset":
+            algn = doc.createElement("alignment")
+            high.appendChild(algn)
+            algn_txt = doc.createTextNode(this_align)
+            algn.appendChild(algn_txt)
     else:
         this_align = "NA"
 
     if sieve_buf_size_i is not None:
         this_siv_buf_size = genome[sieve_buf_size_i].replace(" ", "")
-        siv_buf = doc.createElement("sieve_buf_size")
-        high.appendChild(siv_buf)
-        siv_buf_txt = doc.createTextNode(this_siv_buf_size)
-        siv_buf.appendChild(siv_buf_txt)
+        if this_siv_buf_size.lower() != "unset":
+            siv_buf = doc.createElement("sieve_buf_size")
+            high.appendChild(siv_buf)
+            siv_buf_txt = doc.createTextNode(this_siv_buf_size)
+            siv_buf.appendChild(siv_buf_txt)
     else:
         this_siv_buf_size = "NA"
 
