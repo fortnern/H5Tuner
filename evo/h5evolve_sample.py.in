@@ -95,10 +95,13 @@ alignment_i = None
 #alignment = ["1, 1", "0, 4096", "0, 16384", "0, 65536", "0, 262144", "1024, 4096", "1024, 16384", "1024, 65536", "1024, 262144", "4096, 16384", "4096, 65536", "4096, 262144", "16384, 65536", "16384, 262144"]
 
 # Data Sieving buffer size
-# PRABHAT
 sieve_buf_size_i = None
+# PRABHAT
 #siv_buf_size = [65535, 131070, 262140, 524280, 1048560, 2097120];
 #siv_buf_size = [536870912]
+
+# Chunk size
+chunk_i = None
 
 #####################################################################
 # Utility files used during the evolve iterations
@@ -109,7 +112,7 @@ running_time_file = open('./running_time.txt', 'w')
 perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
 def eval_func(genome):
-    global strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, run_cmd
+    global strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
 
     Logdir = './Logs/'
     HOME = os.environ['PWD']
@@ -200,12 +203,22 @@ def eval_func(genome):
     else:
         this_siv_buf_size = "NA"
 
+    if chunk_i is not None:
+        this_chunk = genome[chunk_i].replace(" ", "")
+        if this_chunk.lower() != "unset":
+            chunk = doc.createElement("chunk")
+            high.appendChild(chunk)
+            chunk_txt = doc.createTextNode(this_chunk)
+            chunk.appendChild(chunk_txt)
+    else:
+        this_chunk = "NA"
+
     # check to see if result's in history; if it is, use that!
     #for line in open("result_output.txt"):
     #   if str(this_strp_fac) + ", " + str(this_strp_unt) + ", " + str(this_cb_nds) + str(this_cb_buf_size) + ", " + str(this_align) + ", " + str(this_siv_buf_size) in line:
     #      return float(line.split(", ")[6])
 
-    str_param = this_strp_fac + ', ' + this_strp_unt + ', ' + this_cb_nds + ', ' + this_cb_buf_size + ', ' + this_align + ', ' + ', ' + this_siv_buf_size
+    str_param = this_strp_fac + ', ' + this_strp_unt + ', ' + this_cb_nds + ', ' + this_cb_buf_size + ', ' + this_align + ', ' + this_siv_buf_size + ', ' + this_chunk
 
     print "Evaluate Parameters config (%s): " % (str_param)
     #sys.stdout.flush()
@@ -328,7 +341,7 @@ def ConvergenceCriteria(ga_engine):
 def run_main():
     print "Starting main()!"
     #sys.stdout.flush()
-    global NUM_GENS, NUM_POP, NUM_ELITE, GLOB_COUNT, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, run_cmd
+    global NUM_GENS, NUM_POP, NUM_ELITE, GLOB_COUNT, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
 
     # Set up parser
     parser = optparse.OptionParser()
@@ -350,6 +363,9 @@ def run_main():
 
     # Add sieve buffer size option
     parser.add_option("--sieve_buf_size", action="store", dest="sieve_buf_size_str")
+
+    # Add chunk size option
+    parser.add_option("--chunk", action="store", dest="chunk_str")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
@@ -436,6 +452,19 @@ def run_main():
 
         # Keep track of index in genome
         sieve_buf_size_i = genome_i
+        genome_i += 1
+
+    # Handle chunk size
+    if opt.chunk_str is not None:
+        # Build list for genome
+        chunk = opt.chunk_str.split(";")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(chunk)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        chunk_i = genome_i
         genome_i += 1
 
     genome = G1DList.G1DList(genome_i)
