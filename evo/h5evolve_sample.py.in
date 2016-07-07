@@ -204,15 +204,15 @@ def eval_func(genome):
 
     str_param = this_strp_fac + ', ' + this_strp_unt + ', ' + this_cb_nds + ', ' + this_cb_buf_size + ', ' + this_align + ', ' + this_siv_buf_size + ', ' + this_chunk
 
+    print "Evaluate Parameters config (%s): " % (str_param)
+    #sys.stdout.flush()
+
     # check to see if result's in history; if it is, use that!
     for line in open("result_output.txt"):
         if str_param in line:
             elapsed = float(line.split(": ")[2])
-            print "configuration already ran, returning %f" % (elapsed)
+            print "Configuration already ran, returning %f" % (elapsed)
             return float(line.split(": ")[2])
-
-    print "Evaluate Parameters config (%s): " % (str_param)
-    #sys.stdout.flush()
 
     home_dir = os.environ['PWD'];
     file_path = home_dir + 'config.xml'
