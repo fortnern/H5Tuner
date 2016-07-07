@@ -36,7 +36,6 @@ from pyevolve import Consts
 
 from xml.dom.minidom import Document
 
-#NO_OF_PARAMS=5
 STRING_LEN=6
 NUM_ELITE=3
 NUM_POP=15
@@ -65,13 +64,11 @@ def alarm_handler(signum, frame):
 # are shown to be very bad. Choosing stripe_count to be -1 means stripe over all of
 # available OSTs.
 strp_fac_i = None
-# strp_fac = [4, 8, 16, 24, 32, 48, 64, 96, 128, -1];
 
 # The default value for stripe_size is 1 MB. It has to be a multiple of page size(64KB).
 # A good stiripe size for seq.I/O is between 1 MB and 4 MB. The minimu is 512 KB and the
 # maximum is 4 GB.
 strp_unt_i = None
-# strp_unt = [1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728];
 
 #######################
 # Collective Buffering
@@ -79,26 +76,18 @@ strp_unt_i = None
 
 # The number of aggregators
 cb_nds_i = None
-# cb_nds = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 256];
 
 # Collective buffering buffer size
 cb_buf_size_i = None
-# cb_buf_size = [4194304, 8388608, 16777216, 33554432, 67108864, 134217728];
 
 #################
 # HDF5
 #################
 # HDF5 Alignment
-# NEW, NOT FOR IPDPS: alignment = [65536, 131072, 262144, 524288, 1048576, 2097152];
-#alignment = [65535, 131070, 262140, 524280, 1048560, 2097120];
 alignment_i = None
-#alignment = ["1, 1", "0, 4096", "0, 16384", "0, 65536", "0, 262144", "1024, 4096", "1024, 16384", "1024, 65536", "1024, 262144", "4096, 16384", "4096, 65536", "4096, 262144", "16384, 65536", "16384, 262144"]
 
 # Data Sieving buffer size
 sieve_buf_size_i = None
-# PRABHAT
-#siv_buf_size = [65535, 131070, 262140, 524280, 1048560, 2097120];
-#siv_buf_size = [536870912]
 
 # Chunk size
 chunk_i = None
@@ -263,16 +252,6 @@ def eval_func(genome):
         for i in range(5):
             start = time.time()
 
-            # print 'start time: ', start
-            # VPIC RUN
-            #q = subprocess.Popen(['ibrun /work/01657/bbehza2/HDF/VPIC/vpicbench_uni/vpicio_uni /scratch/01657/bbehza2/sample_dataset.h5part', "-np", "512"], stdout=subprocess.PIPE, shell=True)
-
-            # VORPAL RUN
-            # q = subprocess.Popen(["ibrun $WORK/HDF/VORPALIO/vorpalio/vorpalio -b 100 100 60 -n 8 8 8 -t 20 -o '/scratch/01657/bbehza2'", "-np", "512"], stdout=subprocess.PIPE, shell=True)
-
-            # GCRM RUN
-            #q = subprocess.Popen(["ibrun $WORK/HDF/GCRM/gcrmio/gcrmio -r 11 -s 7 -prs -t 10 -o '/scratch/01657/bbehza2'", "-np", "128"], stdout=subprocess.PIPE, shell=True)
-            #q = subprocess.Popen(["ibrun $WORK/HDF/GCRM/gcrmio/gcrmio -r 11 -s 7 -prs -t 40 -o '/scratch/01657/bbehza2'", "-np", "512"], stdout=subprocess.PIPE, shell=True)
 
             q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
             out, err = q.communicate()
@@ -280,23 +259,6 @@ def eval_func(genome):
 
             elapsed = (time.time() - start)
             print 'elapsed time; ', elapsed
-
-            ####################################################################
-            # Monitor size of output
-            ####################################################################
-
-            #if "sample_dataset.h5part" in os.listdir(SCRATCH):
-            #    if os.path.getsize(SCRATCH + '/sample_dataset.h5part') > VPIC_512:
-            #        valid = 1;
-            #        break;
-            #if "vorpalio.h5" in os.listdir(SCRATCH):
-            #    if os.path.getsize(SCRATCH + '/vorpalio.h5') > VORPAL_512:
-            #        valid = 1;
-            #        break;
-            #if "prs.h5" in os.listdir(SCRATCH):
-            #   if os.path.getsize(SCRATCH + '/prs.h5') > GCRM_512:
-            #        valid = 1;
-            #        break;
 
     except Alarm:
         print 'Taking too long, returning\n'
@@ -330,10 +292,10 @@ def eval_func(genome):
 
     return float(elapsed)
 
-def ConvergenceCriteria(ga_engine):
-    best = ga_engine.bestIndividual()
+#def ConvergenceCriteria(ga_engine):
+#    best = ga_engine.bestIndividual()
     # Best Score of 128 cores is about 50 seconds
-    return best.score <= 40
+#    return best.score <= 40
     # Best Score of 4096 cores is about 600 seconds
     #return best.score <= 600
 
