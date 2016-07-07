@@ -487,7 +487,39 @@ def run_main():
     ga.evolve(freq_stats=1)
     print 'closing result'
     result_output.close()
-    print 'Best solution'
+
+    print 'Evolution Parameters:'
+    param_str = "["
+    if strp_fac_i is not None:
+        param_str += "striping_factor"
+    if strp_unt_i is not None:
+        if len(param_str) > 1:
+            param_str += ", "
+        param_str += "striping_unit"
+    if cb_nds_i is not None:
+        if len(param_str) > 1:
+            param_str += ", "
+        param_str += "cb_nodes"
+    if cb_buf_size_i is not None:
+        if len(param_str) > 1:
+            param_str += ", "
+        param_str += "cb_buffer_size"
+    if alignment_i is not None:
+        if len(param_str) > 1:
+            param_str += ", "
+        param_str += "alignment"
+    if sieve_buf_size_i is not None:
+        if len(param_str) > 1:
+            param_str += ", "
+        param_str += "sieve_buf_size"
+    if chunk_i is not None:
+        if len(param_str) > 1:
+            param_str += ", "
+        param_str += "chunk"
+    param_str += "]"
+    print param_str
+
+    print 'Best Solution:'
     print ga.bestIndividual()
 
 if __name__ == "__main__":
