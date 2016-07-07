@@ -133,7 +133,7 @@ def eval_func(genome):
     params.appendChild(low)
 
     if strp_fac_i is not None:
-        this_strp_fac = genome[strp_fac_i].replace(" ", "")
+        this_strp_fac = genome[strp_fac_i]
         if this_strp_fac.lower() != "unset":
             strp_fac_obj = doc.createElement("striping_factor")
             low.appendChild(strp_fac_obj)
@@ -143,7 +143,7 @@ def eval_func(genome):
         this_strp_fac = "NA"
 
     if strp_unt_i is not None:
-        this_strp_unt = genome[strp_unt_i].replace(" ", "")
+        this_strp_unt = genome[strp_unt_i]
         if this_strp_unt.lower() != "unset":
             strp_unt_obj = doc.createElement("striping_unit")
             low.appendChild(strp_unt_obj)
@@ -153,7 +153,7 @@ def eval_func(genome):
         this_strp_unt = "NA"
 
     if cb_nds_i is not None:
-        this_cb_nds = genome[cb_nds_i].replace(" ", "")
+        this_cb_nds = genome[cb_nds_i]
         if this_cb_nds.lower() != "unset":
             cb_n = doc.createElement("cb_nodes")
             mid.appendChild(cb_n)
@@ -163,7 +163,7 @@ def eval_func(genome):
         this_cb_nds = "NA"
 
     if cb_buf_size_i is not None:
-        this_cb_buf_size = genome[cb_buf_size_i].replace(" ", "")
+        this_cb_buf_size = genome[cb_buf_size_i]
         if this_cb_buf_size.lower() != "unset":
             cb_buf = doc.createElement("cb_buffer_size")
             mid.appendChild(cb_buf)
@@ -173,7 +173,7 @@ def eval_func(genome):
         this_cb_buf_size = "NA"
 
     if alignment_i is not None:
-        this_align = genome[alignment_i].replace(" ", "")
+        this_align = genome[alignment_i]
         if this_align.lower() != "unset":
             algn = doc.createElement("alignment")
             high.appendChild(algn)
@@ -183,7 +183,7 @@ def eval_func(genome):
         this_align = "NA"
 
     if sieve_buf_size_i is not None:
-        this_siv_buf_size = genome[sieve_buf_size_i].replace(" ", "")
+        this_siv_buf_size = genome[sieve_buf_size_i]
         if this_siv_buf_size.lower() != "unset":
             siv_buf = doc.createElement("sieve_buf_size")
             high.appendChild(siv_buf)
@@ -193,7 +193,7 @@ def eval_func(genome):
         this_siv_buf_size = "NA"
 
     if chunk_i is not None:
-        this_chunk = genome[chunk_i].replace(" ", "")
+        this_chunk = genome[chunk_i]
         if this_chunk.lower() != "unset":
             chunk = doc.createElement("chunk")
             high.appendChild(chunk)
@@ -345,7 +345,7 @@ def run_main():
     # Handle striping factor
     if opt.strp_fac_str is not None:
         # Build list for genome
-        strp_fac = opt.strp_fac_str.split(",")
+        strp_fac = opt.strp_fac_str.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(strp_fac)
@@ -358,7 +358,7 @@ def run_main():
     # Handle striping unit
     if opt.strp_unt_str is not None:
         # Build list for genome
-        strp_unt = opt.strp_unt_str.split(",")
+        strp_unt = opt.strp_unt_str.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(strp_unt)
@@ -371,7 +371,7 @@ def run_main():
     # Handle collective buffering nodes
     if opt.cb_nds_str is not None:
         # Build list for genome
-        cb_nds = opt.cb_nds_str.split(",")
+        cb_nds = opt.cb_nds_str.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(cb_nds)
@@ -384,7 +384,7 @@ def run_main():
     # Handle collective buffering buffer size
     if opt.cb_buf_size_str is not None:
         # Build list for genome
-        cb_buf_size = opt.cb_buf_size_str.split(",")
+        cb_buf_size = opt.cb_buf_size_str.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(cb_buf_size)
@@ -397,7 +397,7 @@ def run_main():
     # Handle alignment
     if opt.alignment_str is not None:
         # Build list for genome
-        alignment_size = opt.alignment_str.split(";")
+        alignment_size = opt.alignment_str.replace(" ", "").split(";")
 
         # Add to genome
         gal = GAllele.GAlleleList(alignment_size)
@@ -410,7 +410,7 @@ def run_main():
     # Handle sieve buffer size
     if opt.sieve_buf_size_str is not None:
         # Build list for genome
-        sieve_buf_size = opt.sieve_buf_size_str.split(",")
+        sieve_buf_size = opt.sieve_buf_size_str.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(sieve_buf_size)
@@ -423,7 +423,7 @@ def run_main():
     # Handle chunk size
     if opt.chunk_str is not None:
         # Build list for genome
-        chunk = opt.chunk_str.split(";")
+        chunk = opt.chunk_str.replace(" ", "").split(";")
 
         # Add to genome
         gal = GAllele.GAlleleList(chunk)
