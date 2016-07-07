@@ -257,12 +257,16 @@ def eval_func(genome):
             out, err = q.communicate()
             print out
 
-            elapsed = (time.time() - start)
-            print 'elapsed time; ', elapsed
+            if q.returncode == 0:
+                elapsed = (time.time() - start)
+                print 'elapsed time; ', elapsed
+            else:
+                elapsed = float("inf")
+                print 'failure encountered!'
 
     except Alarm:
         print 'Taking too long, returning\n'
-        return float(10000);
+        return float("inf");
 
     ################################################################
     # Evolution settings results update
