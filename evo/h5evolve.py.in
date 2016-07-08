@@ -57,6 +57,15 @@ def alarm_handler(signum, frame):
 #####################################################################################
 
 ###################
+# IBM
+###################
+# IBM lockless IO
+ibm_lockless_i = None
+
+# IBM largeblock IO
+ibm_largeblock_i = None
+
+###################
 # Striping
 ###################
 
@@ -101,7 +110,7 @@ running_time_file = open('./running_time.txt', 'w')
 perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
 def eval_func(genome):
-    global strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
+    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
 
     ####################################################################
     #
@@ -120,6 +129,26 @@ def eval_func(genome):
     params.appendChild(mid);
     low = doc.createElement("Parallel_File_System")
     params.appendChild(low)
+
+    if ibm_lockless_i is not None:
+        this_ibm_lockless = str(genome[ibm_lockless_i])
+        if genome[ibm_lockless_i]:
+            ibm_lockless_obj = doc.createElement("IBM_lockless_io")
+            low.appendChild(ibm_lockless_obj)
+            ibm_lockless_txt = doc.createTextNode("true")
+            ibm_lockless_obj.appendChild(ibm_lockless_txt)
+    else:
+        this_ibm_lockless = "NA"
+
+    if ibm_largeblock_i is not None:
+        this_ibm_largeblock = str(genome[ibm_largeblock_i])
+        if genome[ibm_largeblock_i]:
+            ibm_largeblock_obj = doc.createElement("IBM_largeblock_io")
+            low.appendChild(ibm_largeblock_obj)
+            ibm_largeblock_txt = doc.createTextNode("true")
+            ibm_largeblock_obj.appendChild(ibm_largeblock_txt)
+    else:
+        this_ibm_largeblock = "NA"
 
     if strp_fac_i is not None:
         this_strp_fac = genome[strp_fac_i]
@@ -191,7 +220,7 @@ def eval_func(genome):
     else:
         this_chunk = "NA"
 
-    str_param = this_strp_fac + ', ' + this_strp_unt + ', ' + this_cb_nds + ', ' + this_cb_buf_size + ', ' + this_align + ', ' + this_siv_buf_size + ', ' + this_chunk
+    str_param = this_ibm_lockless + ', ' + this_ibm_largeblock + ', ' + this_strp_fac + ', ' + this_strp_unt + ', ' + this_cb_nds + ', ' + this_cb_buf_size + ', ' + this_align + ', ' + this_siv_buf_size + ', ' + this_chunk
 
     print "Evaluate Parameters config (%s): " % (str_param)
     #sys.stdout.flush()
@@ -298,17 +327,23 @@ def eval_func(genome):
 def run_main():
     print "Starting main()!"
     #sys.stdout.flush()
-    global NUM_POP, GLOB_COUNT, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
+    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
 
     # Set up parser
     parser = optparse.OptionParser()
 
     parser.set_usage("Usage: python h5evolve [OPTION]... \"[EXEC_COMMAND]\"\n" + \
         "Use the genetic algorithm solver pyevolve to optimize settings for EXEC_COMMAND\n" + \
-        "to minimize execution time. Only optimizes the parameters passed as options,\n" + \
-        "including --striping_factor, --striping-unit, --cb_nodes, --cb_buffer_size,\n" + \
-        "--alignment, --sieve_buf_size, and --chunk. At least 2 of these parameters must\n" + \
-        "be specified.")
+        "to minimize execution time. Only optimizes the parameters passed as option,\n" + \
+        "including --IBM_lockless_io, --IBM_largeblock_io, --striping_factor,\n" + \
+        "--striping-unit, --cb_nodes, --cb_buffer_size, --alignment, --sieve_buf_size,\n" + \
+        "and --chunk. At least 2 of these parameters must be specified.")
+
+    # Add IBM lockless IO option
+    parser.add_option("--IBM_lockless_io", action="store_true", default=False, dest="ibm_lockless", help="Enables optimization of the IBM lockless IO option, an alternate way of accessing data on GPFS. This option takes no value, setting the option allows the evolver to try with and without using this method (True and False).")
+
+    # Add IBM largeblock IO option
+    parser.add_option("--IBM_largeblock_io", action="store_true", default=False, dest="ibm_largeblock", help="Enables optimization of the IBM largeblock IO option, an alternate way of accessing data on GPFS. This option takes no value, setting the option allows the evolver to try with and without using this method (True and False).")
 
     # Add striping factor option
     parser.add_option("--striping_factor", action="store", dest="strp_fac", help="Enables optimization of the MPI striping factor, or the number of I/O devices the file should be striped across. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
@@ -351,6 +386,26 @@ def run_main():
 
     # Start building genome
     setOfAlleles = GAllele.GAlleles()
+
+    #Handle IBM lockless IO
+    if opt.ibm_lockless:
+        # Add to genome
+        gal = GAllele.GAlleleList([True, False])
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        ibm_lockless_i = genome_i
+        genome_i += 1
+
+    #Handle IBM largeblock IO
+    if opt.ibm_largeblock:
+        # Add to genome
+        gal = GAllele.GAlleleList([True, False])
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        ibm_largeblock_i = genome_i
+        genome_i += 1
 
     # Handle striping factor
     if opt.strp_fac is not None:
@@ -486,7 +541,15 @@ def run_main():
 
     print 'Evolution Parameters:'
     param_str = "["
+    if ibm_lockless_i is not None:
+        param_str += "IBM_lockless_io"
+    if ibm_largeblock_i is not None:
+        if len(param_str) > 1:
+            param_str += ", "
+        param_str += "IBM_largeblock_io"
     if strp_fac_i is not None:
+        if len(param_str) > 1:
+            param_str += ", "
         param_str += "striping_factor"
     if strp_unt_i is not None:
         if len(param_str) > 1:
