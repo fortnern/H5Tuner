@@ -303,7 +303,7 @@ def run_main():
     # Set up parser
     parser = optparse.OptionParser()
 
-    parser.set_usage("Usage: h5evolve [OPTION]... \"[EXEC_COMMAND]\"\n" + \
+    parser.set_usage("Usage: python h5evolve [OPTION]... \"[EXEC_COMMAND]\"\n" + \
         "Use the genetic algorithm solver pyevolve to optimize settings for EXEC_COMMAND\n" + \
         "to minimize execution time. Only optimizes the parameters passed as options,\n" + \
         "including --striping_factor, --striping-unit, --cb_nodes, --cb_buffer_size,\n" + \
