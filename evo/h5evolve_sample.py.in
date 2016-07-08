@@ -36,7 +36,6 @@ from pyevolve import Consts
 
 from xml.dom.minidom import Document
 
-STRING_LEN=6
 NUM_ELITE=3
 NUM_POP=15
 NUM_GENS=40
@@ -103,17 +102,6 @@ perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 def eval_func(genome):
     global strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
 
-    Logdir = './Logs/'
-    HOME = os.environ['PWD']
-    # set SCRATCH variable prior to execution evolve or use current directory
-    if os.getenv('SCRATCH', 0):
-        SCRATCH = os.environ['SCRATCH']
-    else:
-        # SCRATCH not defined then use PWD
-        SCRATCH = os.environ['PWD']
-        os.environ['SCRATCH'] = SCRATCH
-
-    
     ####################################################################
     #
     # Create the minidom document for tunable parameters
