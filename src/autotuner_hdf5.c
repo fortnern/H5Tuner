@@ -76,10 +76,10 @@ herr_t set_gpfs_parameter(mxml_node_t *tree, const char *parameter_name, const c
                     if(node_file_name)
                         break;
                 }
-                else
-                    ERROR("Unknown GPFS parameter");
             }
         }
+        else
+            ERROR("Unknown GPFS parameter");
     }
 
 done:
