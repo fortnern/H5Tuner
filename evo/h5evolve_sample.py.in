@@ -36,9 +36,10 @@ from pyevolve import Consts
 
 from xml.dom.minidom import Document
 
-NUM_ELITE=3
-NUM_POP=15
-NUM_GENS=40
+DEF_POP=15
+NUM_POP=0
+DEF_GENS=40
+DEF_MUT=0.15
 GLOB_COUNT=0
 
 pyevolve.logEnable()
@@ -262,12 +263,12 @@ def eval_func(genome):
     # Evolution settings results update
     ################################################################
 
-    global NUM_POP, NUM_ELITE, GLOB_COUNT
+    global NUM_POP, GLOB_COUNT
     this_gen = GLOB_COUNT / NUM_POP
     GLOB_COUNT = GLOB_COUNT + 1
     print 'Glog_count ', GLOB_COUNT
     print 'this_gen', this_gen
-    print 'num pop',NUM_POP,'num elite',NUM_ELITE
+    print 'num pop',NUM_POP
 
     str_result = str(this_gen) + ': ' + str_param + ': ' + str(elapsed)
 
@@ -297,31 +298,43 @@ def eval_func(genome):
 def run_main():
     print "Starting main()!"
     #sys.stdout.flush()
-    global NUM_GENS, NUM_POP, NUM_ELITE, GLOB_COUNT, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
+    global NUM_POP, GLOB_COUNT, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
 
     # Set up parser
     parser = optparse.OptionParser()
 
     # Add striping factor option
-    parser.add_option("--striping_factor", action="store", dest="strp_fac_str")
+    parser.add_option("--striping_factor", action="store", dest="strp_fac")
 
     # Add striping unit option
-    parser.add_option("--striping_unit", action="store", dest="strp_unt_str")
+    parser.add_option("--striping_unit", action="store", dest="strp_unt")
 
     # Add collective buffering nodes option
-    parser.add_option("--cb_nodes", action="store", dest="cb_nds_str")
+    parser.add_option("--cb_nodes", action="store", dest="cb_nds")
 
     # Add collective buffering buffer size option
-    parser.add_option("--cb_buffer_size", action="store", dest="cb_buf_size_str")
+    parser.add_option("--cb_buffer_size", action="store", dest="cb_buf_size")
 
     # Add alignment option
-    parser.add_option("--alignment", action="store", dest="alignment_str")
+    parser.add_option("--alignment", action="store", dest="alignment")
 
     # Add sieve buffer size option
-    parser.add_option("--sieve_buf_size", action="store", dest="sieve_buf_size_str")
+    parser.add_option("--sieve_buf_size", action="store", dest="sieve_buf_size")
 
     # Add chunk size option
-    parser.add_option("--chunk", action="store", dest="chunk_str")
+    parser.add_option("--chunk", action="store", dest="chunk")
+
+    # Add population option
+    parser.add_option("--population", action="store", type="int", default=DEF_POP, dest="pop")
+
+    # Add generations option
+    parser.add_option("--generations", action="store", type="int", default=DEF_GENS, dest="gens")
+
+    # Add mutation rate option
+    parser.add_option("--mutation_rate", action="store", type="float", default=DEF_MUT, dest="mut")
+
+    # Add elitism option
+    parser.add_option("--num_elite", action="store", type="int", dest="elite")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
@@ -333,9 +346,9 @@ def run_main():
     setOfAlleles = GAllele.GAlleles()
 
     # Handle striping factor
-    if opt.strp_fac_str is not None:
+    if opt.strp_fac is not None:
         # Build list for genome
-        strp_fac = opt.strp_fac_str.replace(" ", "").split(",")
+        strp_fac = opt.strp_fac.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(strp_fac)
@@ -346,9 +359,9 @@ def run_main():
         genome_i += 1
 
     # Handle striping unit
-    if opt.strp_unt_str is not None:
+    if opt.strp_unt is not None:
         # Build list for genome
-        strp_unt = opt.strp_unt_str.replace(" ", "").split(",")
+        strp_unt = opt.strp_unt.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(strp_unt)
@@ -359,9 +372,9 @@ def run_main():
         genome_i += 1
 
     # Handle collective buffering nodes
-    if opt.cb_nds_str is not None:
+    if opt.cb_nds is not None:
         # Build list for genome
-        cb_nds = opt.cb_nds_str.replace(" ", "").split(",")
+        cb_nds = opt.cb_nds.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(cb_nds)
@@ -372,9 +385,9 @@ def run_main():
         genome_i += 1
 
     # Handle collective buffering buffer size
-    if opt.cb_buf_size_str is not None:
+    if opt.cb_buf_size is not None:
         # Build list for genome
-        cb_buf_size = opt.cb_buf_size_str.replace(" ", "").split(",")
+        cb_buf_size = opt.cb_buf_size.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(cb_buf_size)
@@ -385,9 +398,9 @@ def run_main():
         genome_i += 1
 
     # Handle alignment
-    if opt.alignment_str is not None:
+    if opt.alignment is not None:
         # Build list for genome
-        alignment_size = opt.alignment_str.replace(" ", "").split(";")
+        alignment_size = opt.alignment.replace(" ", "").split(";")
 
         # Add to genome
         gal = GAllele.GAlleleList(alignment_size)
@@ -398,9 +411,9 @@ def run_main():
         genome_i += 1
 
     # Handle sieve buffer size
-    if opt.sieve_buf_size_str is not None:
+    if opt.sieve_buf_size is not None:
         # Build list for genome
-        sieve_buf_size = opt.sieve_buf_size_str.replace(" ", "").split(",")
+        sieve_buf_size = opt.sieve_buf_size.replace(" ", "").split(",")
 
         # Add to genome
         gal = GAllele.GAlleleList(sieve_buf_size)
@@ -411,9 +424,9 @@ def run_main():
         genome_i += 1
 
     # Handle chunk size
-    if opt.chunk_str is not None:
+    if opt.chunk is not None:
         # Build list for genome
-        chunk = opt.chunk_str.replace(" ", "").split(";")
+        chunk = opt.chunk.replace(" ", "").split(";")
 
         # Add to genome
         gal = GAllele.GAlleleList(chunk)
@@ -422,6 +435,16 @@ def run_main():
         # Keep track of index in genome
         chunk_i = genome_i
         genome_i += 1
+
+    # Handle population
+    NUM_POP = opt.pop;
+
+    # Handle elitism
+    if opt.elite is None:
+        elite = NUM_POP // 5
+    else:
+        elite = opt.elite
+
 
     genome = G1DList.G1DList(genome_i)
     genome.setParams(allele=setOfAlleles)
@@ -432,15 +455,25 @@ def run_main():
 
     ga = GSimpleGA.GSimpleGA(genome)
     ga.selector.set(Selectors.GRouletteWheel)
-    ga.setMutationRate(0.15);
-    ga.setGenerations(NUM_GENS)
+    ga.setMutationRate(opt.mut);
+    ga.setGenerations(opt.gens)
     #ga.terminationCriteria.set(ConvergenceCriteria)
     ga.setPopulationSize(NUM_POP)
     ga.setMinimax(Consts.minimaxType["minimize"])
-    ga.setElitism(True)
-    ga.setElitismReplacement(NUM_ELITE)
+    if elite == 0:
+        ga.setElitism(False)
+    else:
+        ga.setElitism(True)
+        ga.setElitismReplacement(elite)
+
+    print "pyevolve options:"
+    print "Mutation rate: " + str(opt.mut)
+    print "Generations: " + str(opt.gens)
+    print "Popultation: " + str(NUM_POP)
+    print "Number of elites: " + str(elite)
     print 'ga.evolve'
     ga.evolve(freq_stats=1)
+
     print 'closing result'
     result_output.close()
 
