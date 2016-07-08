@@ -303,38 +303,45 @@ def run_main():
     # Set up parser
     parser = optparse.OptionParser()
 
+    parser.set_usage("Usage: h5evolve [OPTION]... \"[EXEC_COMMAND]\"\n" + \
+        "Use the genetic algorithm solver pyevolve to optimize settings for EXEC_COMMAND\n" + \
+        "to minimize execution time. Only optimizes the parameters passed as options,\n" + \
+        "including --striping_factor, --striping-unit, --cb_nodes, --cb_buffer_size,\n" + \
+        "--alignment, --sieve_buf_size, and --chunk. At least 2 of these parameters must\n" + \
+        "be specified.")
+
     # Add striping factor option
-    parser.add_option("--striping_factor", action="store", dest="strp_fac")
+    parser.add_option("--striping_factor", action="store", dest="strp_fac", help="Enables optimization of the MPI striping factor, or the number of I/O devices the file should be striped across. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
 
     # Add striping unit option
-    parser.add_option("--striping_unit", action="store", dest="strp_unt")
+    parser.add_option("--striping_unit", action="store", dest="strp_unt", help="Enables optimization of the MPI striping unit, or the stripe size to use when striping files. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
 
     # Add collective buffering nodes option
-    parser.add_option("--cb_nodes", action="store", dest="cb_nds")
+    parser.add_option("--cb_nodes", action="store", dest="cb_nds", help="Enables optimization of the MPI collective buffering nodes, or the number of nodes to use for collective buffering. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
 
     # Add collective buffering buffer size option
-    parser.add_option("--cb_buffer_size", action="store", dest="cb_buf_size")
+    parser.add_option("--cb_buffer_size", action="store", dest="cb_buf_size", help="Enables optimization of the MPI collective buffering size, or the size that can be used for collective buffering on each node. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
 
     # Add alignment option
-    parser.add_option("--alignment", action="store", dest="alignment")
+    parser.add_option("--alignment", action="store", dest="alignment", help="Enables optimization of the HDF5 threshold and alignment properties. Value should be set to a semicolon-separated list of possible values, one of which may be \"unset\" which does not set any value. Each value should follow the format \"threshold,alignment\", where threshold is the minimum block size to trigger alignment of that block on disk, and alignment is the value that all aligned blocks must be aligned to (file addresses must be a multiple of alignment)")
 
     # Add sieve buffer size option
-    parser.add_option("--sieve_buf_size", action="store", dest="sieve_buf_size")
+    parser.add_option("--sieve_buf_size", action="store", dest="sieve_buf_size", help="Enables optimization of the HDF5 sieve buffer size property, or the size of the buffer to use to aggregate strided uncached raw data I/O (which would otherwise transalte to large numbers of small I/O operations). Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
 
     # Add chunk size option
-    parser.add_option("--chunk", action="store", dest="chunk")
+    parser.add_option("--chunk", action="store", dest="chunk", help="Enables optimization of the HDF5 chunk size. Value should be set to a semicolon-separated list of possible values, one of which may be \"unset\" which does not set any value. Each value is a comma-separated list of chunk dimensions. The number of chunk dimensions must be equal to the rank of the dataset. This will apply to all datasets created by EXEC_COMMAND.")
 
     # Add population option
-    parser.add_option("--population", action="store", type="int", default=DEF_POP, dest="pop")
+    parser.add_option("--population", action="store", type="int", default=DEF_POP, dest="pop", help="Population size for genetic algorithm. Number of candidates in each generation for reproduction. Default is %default.")
 
     # Add generations option
-    parser.add_option("--generations", action="store", type="int", default=DEF_GENS, dest="gens")
+    parser.add_option("--generations", action="store", type="int", default=DEF_GENS, dest="gens", help="Number of generations for genetic algorithm. This is the number of iterations that the evolver runs. Default is %default.")
 
     # Add mutation rate option
-    parser.add_option("--mutation_rate", action="store", type="float", default=DEF_MUT, dest="mut")
+    parser.add_option("--mutation_rate", action="store", type="float", default=DEF_MUT, dest="mut", help="Mutation rate for genetic algorithm. The chance (from 0.0 to 1.0) that a parameter will be randomly changed between generations. Default is %default.")
 
     # Add elitism option
-    parser.add_option("--num_elite", action="store", type="int", dest="elite")
+    parser.add_option("--num_elite", action="store", type="int", dest="elite", help="Number of elites for genetic algorithm. This is the number of top-performing candidates that are passed without modification (cloned) to the next generation. Default is population / 5 (rounded down).")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
