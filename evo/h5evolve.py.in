@@ -228,9 +228,9 @@ def eval_func(genome):
     # check to see if result's in history; if it is, use that!
     for line in open("result_output.txt"):
         if str_param in line:
-            elapsed = float(line.split(": ")[2])
-            print "Configuration already ran, returning %f" % (elapsed)
-            return float(line.split(": ")[2])
+            tot_elapsed = float(line.split(": ")[2])
+            print "Configuration already ran, returning %f" % (tot_elapsed)
+            return tot_elapsed
 
     home_dir = os.environ['PWD'];
     file_path = home_dir + 'config.xml'
@@ -269,9 +269,9 @@ def eval_func(genome):
         valid = 0;
         start = 0.0;
         elapsed = 0.0;
+        tot_elapsed = 0.0;
         for i in range(5):
             start = time.time()
-
 
             q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
             out, err = q.communicate()
@@ -280,9 +280,11 @@ def eval_func(genome):
             if q.returncode == 0:
                 elapsed = (time.time() - start)
                 print 'elapsed time; ', elapsed
+                tot_elapsed += elapsed
             else:
-                elapsed = float("inf")
+                tot_elapsed = float("inf")
                 print 'failure encountered!'
+                break
 
     except Alarm:
         print 'Taking too long, returning\n'
@@ -299,7 +301,7 @@ def eval_func(genome):
     print 'this_gen', this_gen
     print 'num pop',NUM_POP
 
-    str_result = str(this_gen) + ': ' + str_param + ': ' + str(elapsed)
+    str_result = str(this_gen) + ': ' + str_param + ': ' + str(tot_elapsed)
 
     config_feat_file.write(str_param)
     config_feat_file.write('\n')
@@ -314,7 +316,7 @@ def eval_func(genome):
     running_time_file.flush()
     perf_feat_filenames_file.flush()
 
-    return float(elapsed)
+    return float(tot_elapsed)
 
 #def ConvergenceCriteria(ga_engine):
 #    best = ga_engine.bestIndividual()
