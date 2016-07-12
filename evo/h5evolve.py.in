@@ -228,9 +228,9 @@ def eval_func(genome):
     # check to see if result's in history; if it is, use that!
     for line in open("result_output.txt"):
         if str_param in line:
-            tot_elapsed = float(line.split(": ")[2])
-            print "Configuration already ran, returning %f" % (tot_elapsed)
-            return tot_elapsed
+            elapsed = float(line.split(": ")[2])
+            print "Configuration already ran, returning %f" % (elapsed)
+            return elapsed
 
     home_dir = os.environ['PWD'];
     file_path = home_dir + 'config.xml'
@@ -274,17 +274,15 @@ def eval_func(genome):
             if !env_cost:
                 start = time.time()
 
-            q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
-            out, err = q.communicate()
-            print out
+                q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
+                out, err = q.communicate()
+                print out
 
             if q.returncode == 0:
-                if !env_cost:
-                    elapsed = (time.time() - start)
-                    print 'elapsed time; ', elapsed
-                else:
+                if env_cost:
                     elapsed = os.environ['H5EVOLVE_COST']
-                    print 'reported cost
+                else:
+                    elapsed = (time.time() - start)
                 tot_elapsed += elapsed
             else:
                 tot_elapsed = float("inf")
@@ -293,7 +291,14 @@ def eval_func(genome):
 
     except Alarm:
         print 'Taking too long, returning\n'
-        return float("inf");
+        return float("inf")
+
+    # Calculate average running time
+    elapsed = tot_elapsed / 5.0
+    if env_cost:
+        print 'Average cost:', cost
+    else:
+        print 'Average elapsed time:', elapsed
 
     ################################################################
     # Evolution settings results update
@@ -306,7 +311,7 @@ def eval_func(genome):
     print 'this_gen', this_gen
     print 'num pop',NUM_POP
 
-    str_result = str(this_gen) + ': ' + str_param + ': ' + str(tot_elapsed)
+    str_result = str(this_gen) + ': ' + str_param + ': ' + str(elapsed)
 
     config_feat_file.write(str_param)
     config_feat_file.write('\n')
@@ -321,7 +326,7 @@ def eval_func(genome):
     running_time_file.flush()
     perf_feat_filenames_file.flush()
 
-    return float(tot_elapsed)
+    return float(elapsed)
 
 #def ConvergenceCriteria(ga_engine):
 #    best = ga_engine.bestIndividual()
