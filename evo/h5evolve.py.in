@@ -110,7 +110,7 @@ running_time_file = open('./running_time.txt', 'w')
 perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
 def eval_func(genome):
-    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
+    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, env_cost
 
     ####################################################################
     #
@@ -271,15 +271,20 @@ def eval_func(genome):
         elapsed = 0.0;
         tot_elapsed = 0.0;
         for i in range(5):
-            start = time.time()
+            if !env_cost:
+                start = time.time()
 
             q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
             out, err = q.communicate()
             print out
 
             if q.returncode == 0:
-                elapsed = (time.time() - start)
-                print 'elapsed time; ', elapsed
+                if !env_cost:
+                    elapsed = (time.time() - start)
+                    print 'elapsed time; ', elapsed
+                else:
+                    elapsed = os.environ['H5EVOLVE_COST']
+                    print 'reported cost
                 tot_elapsed += elapsed
             else:
                 tot_elapsed = float("inf")
@@ -329,7 +334,7 @@ def eval_func(genome):
 def run_main():
     print "Starting main()!"
     #sys.stdout.flush()
-    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd
+    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, env_cost
 
     # Set up parser
     parser = optparse.OptionParser()
@@ -379,6 +384,9 @@ def run_main():
 
     # Add elitism option
     parser.add_option("--num_elite", action="store", type="int", dest="elite", help="Number of elites for genetic algorithm. This is the number of top-performing candidates that are passed without modification (cloned) to the next generation. Default is population / 5 (rounded down).")
+
+    # Add environmental variable cost option
+    parser.add_option("--env_cost", action="store_true", default=False, dest="env_cost", help="Whether h5evolve should use the contents of the environmental variable H5EVOLVE_COST as set by EXEC_COMMAND to determine the cost (i.e. the opposite of fitness) of the configuration. Default is %default")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
@@ -508,6 +516,9 @@ def run_main():
         elite = NUM_POP // 5
     else:
         elite = opt.elite
+
+    # Handle env_cost
+    env_cost = opt.env_cost
 
 
     genome = G1DList.G1DList(genome_i)
