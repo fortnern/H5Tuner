@@ -110,7 +110,7 @@ running_time_file = open('./running_time.txt', 'w')
 perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
 def eval_func(genome):
-    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, env_cost
+    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file
 
     ####################################################################
     #
@@ -271,18 +271,20 @@ def eval_func(genome):
         elapsed = 0.0;
         tot_elapsed = 0.0;
         for i in range(5):
-            if !env_cost:
+            if cost_file is None:
                 start = time.time()
 
-                q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
-                out, err = q.communicate()
-                print out
+            q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
+            out, err = q.communicate()
+            print out
 
             if q.returncode == 0:
-                if env_cost:
-                    elapsed = os.environ['H5EVOLVE_COST']
-                else:
+                if cost_file is None:
                     elapsed = (time.time() - start)
+                else:
+                    cost_file_f = open(cost_file)
+                    elapsed = float(cost_file_f.readline())
+                    cost_file_f.close()
                 tot_elapsed += elapsed
             else:
                 tot_elapsed = float("inf")
@@ -295,10 +297,10 @@ def eval_func(genome):
 
     # Calculate average running time
     elapsed = tot_elapsed / 5.0
-    if env_cost:
-        print 'Average cost:', cost
-    else:
+    if cost_file is None:
         print 'Average elapsed time:', elapsed
+    else:
+        print 'Average cost:', elapsed
 
     ################################################################
     # Evolution settings results update
@@ -339,7 +341,7 @@ def eval_func(genome):
 def run_main():
     print "Starting main()!"
     #sys.stdout.flush()
-    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, env_cost
+    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file
 
     # Set up parser
     parser = optparse.OptionParser()
@@ -390,8 +392,8 @@ def run_main():
     # Add elitism option
     parser.add_option("--num_elite", action="store", type="int", dest="elite", help="Number of elites for genetic algorithm. This is the number of top-performing candidates that are passed without modification (cloned) to the next generation. Default is population / 5 (rounded down).")
 
-    # Add environmental variable cost option
-    parser.add_option("--env_cost", action="store_true", default=False, dest="env_cost", help="Whether h5evolve should use the contents of the environmental variable H5EVOLVE_COST as set by EXEC_COMMAND to determine the cost (i.e. the opposite of fitness) of the configuration. Default is %default")
+    # Add cost file option
+    parser.add_option("--cost_file", action="store", dest="cost_file", help="Text file created by EXEC_COMMAND that contains the self-reported cost (i.e. the opposite of fitness) of the configuration, formatted as a float. By default h5evolve uses the running time of EXEC_COMMAND as the cost.")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
@@ -522,8 +524,8 @@ def run_main():
     else:
         elite = opt.elite
 
-    # Handle env_cost
-    env_cost = opt.env_cost
+    # Handle cost file
+    cost_file = opt.cost_file
 
 
     genome = G1DList.G1DList(genome_i)
