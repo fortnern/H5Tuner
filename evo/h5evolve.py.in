@@ -254,17 +254,6 @@ def eval_func(genome):
     signal.signal(signal.SIGALRM, alarm_handler)
     signal.alarm(59*60)  # 59 minutes
 
-    #################################
-    # SIZE OF THE OUTPUT FILE OF
-    #################################
-    VPIC_128 = 32000000
-    VORPAL_128 = 34000000
-    GCRM_128 = 30000000
-    VPIC_512 = 120000000
-    VORPAL_512 = 120000000
-    GCRM_512 = 120000000
-    VPIC_4096 = 1000000000
-
     try:
         valid = 0;
         start = 0.0;
