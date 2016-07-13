@@ -272,7 +272,6 @@ def eval_func(genome):
             # Start alarm timer
             if timeout is not None:
                 signal.alarm(timeout)
-                print "Timeout set: ", timeout
 
             q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
             out, err = q.communicate()
