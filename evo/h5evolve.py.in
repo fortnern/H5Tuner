@@ -101,12 +101,6 @@ sieve_buf_size_i = None
 # Chunk size
 chunk_i = None
 
-##################
-# General options
-##################
-# Timeout
-timeout = None
-
 #####################################################################
 # Utility files used during the evolve iterations
 #####################################################################
@@ -257,7 +251,7 @@ def eval_func(genome):
     todays_date = datetime.datetime.now()
     print todays_date
 
-    if timeout is not None:
+    if timeout > 0:
         signal.signal(signal.SIGALRM, alarm_handler)
 
     try:
@@ -270,14 +264,14 @@ def eval_func(genome):
                 start = time.time()
 
             # Start alarm timer
-            if timeout is not None:
+            if timeout > 0:
                 signal.alarm(timeout)
 
             q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
             out, err = q.communicate()
 
             # End alarm timer
-            if timeout is not None:
+            if timeout > 0:
                 signal.alarm(0)
 
             print out
@@ -400,7 +394,7 @@ def run_main():
     parser.add_option("--cost_file", action="store", dest="cost_file", help="Text file created by EXEC_COMMAND that contains the self-reported cost (i.e. the opposite of fitness) of the configuration, formatted as a float. By default h5evolve uses the running time of EXEC_COMMAND as the cost.")
 
     # Add timeout option
-    parser.add_option("--timeout", action="store", default="3540", dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or \"none\" for no timeout. Default is %default.")
+    parser.add_option("--timeout", action="store", type = "int", default=3540, dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or 0 for no timeout. Default is %default.")
 
     # Add runs option
     parser.add_option("--runs", action="store", type="int", default=5, dest="runs", help="Number of iterations to run for each configuration. The results of these runs are then averaged. Default is %default.")
@@ -538,8 +532,7 @@ def run_main():
     cost_file = opt.cost_file
 
     # Handle timeout
-    if opt.timeout.lower() != "none":
-        timeout = int(opt.timeout)
+    timeout = opt.timeout
 
     # Handle runs
     runs = opt.runs
