@@ -116,7 +116,7 @@ running_time_file = open('./running_time.txt', 'w')
 perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
 def eval_func(genome):
-    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout
+    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout, runs
 
     ####################################################################
     #
@@ -265,7 +265,7 @@ def eval_func(genome):
         start = 0.0;
         elapsed = 0.0;
         tot_elapsed = 0.0;
-        for i in range(5):
+        for i in range(runs):
             if cost_file is None:
                 start = time.time()
 
@@ -300,7 +300,7 @@ def eval_func(genome):
         return float("inf")
 
     # Calculate average running time
-    elapsed = tot_elapsed / 5.0
+    elapsed = tot_elapsed / runs
     if cost_file is None:
         print 'Average elapsed time:', elapsed
     else:
@@ -345,7 +345,7 @@ def eval_func(genome):
 def run_main():
     print "Starting main()!"
     #sys.stdout.flush()
-    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout
+    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout, runs
 
     # Set up parser
     parser = optparse.OptionParser()
@@ -401,6 +401,9 @@ def run_main():
 
     # Add timeout option
     parser.add_option("--timeout", action="store", default="3540", dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or \"none\" for no timeout. Default is %default.")
+
+    # Add runs option
+    parser.add_option("--runs", action="store", type="int", default=5, dest="runs", help="Number of iterations to run for each configuration. The results of these runs are then averaged. Default is %default.")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
@@ -537,6 +540,9 @@ def run_main():
     # Handle timeout
     if opt.timeout.lower() != "none":
         timeout = int(opt.timeout)
+
+    # Handle runs
+    runs = opt.runs
 
 
     genome = G1DList.G1DList(genome_i)
