@@ -101,6 +101,12 @@ sieve_buf_size_i = None
 # Chunk size
 chunk_i = None
 
+##################
+# General options
+##################
+# Timeout
+timeout = None
+
 #####################################################################
 # Utility files used during the evolve iterations
 #####################################################################
@@ -110,7 +116,7 @@ running_time_file = open('./running_time.txt', 'w')
 perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
 def eval_func(genome):
-    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file
+    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout
 
     ####################################################################
     #
@@ -251,8 +257,8 @@ def eval_func(genome):
     todays_date = datetime.datetime.now()
     print todays_date
 
-    signal.signal(signal.SIGALRM, alarm_handler)
-    signal.alarm(59*60)  # 59 minutes
+    if timeout is not None:
+        signal.signal(signal.SIGALRM, alarm_handler)
 
     try:
         valid = 0;
@@ -263,8 +269,18 @@ def eval_func(genome):
             if cost_file is None:
                 start = time.time()
 
+            # Start alarm timer
+            if timeout is not None:
+                signal.alarm(timeout)
+                print "Timeout set: ", timeout
+
             q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
             out, err = q.communicate()
+
+            # End alarm timer
+            if timeout is not None:
+                signal.alarm(0)
+
             print out
 
             if q.returncode == 0:
@@ -330,7 +346,7 @@ def eval_func(genome):
 def run_main():
     print "Starting main()!"
     #sys.stdout.flush()
-    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file
+    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout
 
     # Set up parser
     parser = optparse.OptionParser()
@@ -383,6 +399,9 @@ def run_main():
 
     # Add cost file option
     parser.add_option("--cost_file", action="store", dest="cost_file", help="Text file created by EXEC_COMMAND that contains the self-reported cost (i.e. the opposite of fitness) of the configuration, formatted as a float. By default h5evolve uses the running time of EXEC_COMMAND as the cost.")
+
+    # Add timeout option
+    parser.add_option("--timeout", action="store", default="3540", dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or \"none\" for no timeout. Default is %default.")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
@@ -515,6 +534,10 @@ def run_main():
 
     # Handle cost file
     cost_file = opt.cost_file
+
+    # Handle timeout
+    if opt.timeout.lower() != "none":
+        timeout = int(opt.timeout)
 
 
     genome = G1DList.G1DList(genome_i)
