@@ -40,6 +40,8 @@ DEF_POP=15
 NUM_POP=0
 DEF_GENS=40
 DEF_MUT=0.15
+DEF_TIMEOUT=3540
+DEF_RUNS=5
 GLOB_COUNT=0
 
 pyevolve.logEnable()
@@ -394,10 +396,10 @@ def run_main():
     parser.add_option("--cost_file", action="store", dest="cost_file", help="Text file created by EXEC_COMMAND that contains the self-reported cost (i.e. the opposite of fitness) of the configuration, formatted as a float. By default h5evolve uses the running time of EXEC_COMMAND as the cost.")
 
     # Add timeout option
-    parser.add_option("--timeout", action="store", type = "int", default=3540, dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or 0 for no timeout. Default is %default.")
+    parser.add_option("--timeout", action="store", type = "int", default=DEF_TIMEOUT, dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or 0 for no timeout. Default is %default.")
 
     # Add runs option
-    parser.add_option("--runs", action="store", type="int", default=5, dest="runs", help="Number of iterations to run for each configuration. The results of these runs are then averaged. Default is %default.")
+    parser.add_option("--runs", action="store", type="int", default=DEF_RUNS, dest="runs", help="Number of iterations to run for each configuration. The results of these runs are then averaged. Default is %default.")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
