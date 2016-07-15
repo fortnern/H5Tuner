@@ -32,6 +32,7 @@ from pyevolve import GAllele
 from pyevolve import Mutators
 from pyevolve import Initializators
 from pyevolve import Crossovers
+from pyevolve import Scaling
 from pyevolve import Consts
 
 
@@ -399,6 +400,9 @@ def run_main():
     # Add selector option
     parser.add_option("--selector", action="store", type="choice", choices=["rank", "roulette", "tournament", "tournament_alt", "uniform"], default="roulette", dest="selector", help="Genetic crossover (recombination) method. Choices are \"rank\", \"roulette\", \"tournament\", \"tournament_alt\", and \"uniform\". Default is %default.")
 
+    # Add scaling option
+    parser.add_option("--scaling", action="store", type="choice", choices=["boltzmann", "exponential", "linear", "power_law", "saturated", "sigma_trunc"], dest="scaling", help="Candidate score (cost) scaling method. Choices are \"boltzmann\", \"exponential\", \"linear\", \"power_law\", \"saturated\", and \"sigma_trunc\". Default is the default for pyevolve, currently linear.")
+
     # Add elitism option
     parser.add_option("--num_elite", action="store", type="int", dest="elite", help="Number of elites for genetic algorithm. This is the number of top-performing candidates that are passed without modification (cloned) to the next generation. Default is population / 5 (rounded down).")
 
@@ -594,6 +598,22 @@ def run_main():
     # Set population
     ga.setPopulationSize(NUM_POP)
 
+    # Set scaling
+    if opt.scaling is not None:
+        pop = ga.getPopulation()
+        if opt.scaling == "boltzmann":
+            pop.scaleMethod.set(Scaling.BoltzmannScaling)
+        elif opt.scaling == "exponential":
+            pop.scaleMethod.set(Scaling.ExponentialScaling)
+        elif opt.scaling == "linear":
+            pop.scaleMethod.set(Scaling.LinearScaling)
+        elif opt.scaling == "power_law":
+            pop.scaleMethod.set(Scaling.PowerLawScaling)
+        elif opt.scaling == "saturated":
+            pop.scaleMethod.set(Scaling.SaturatedScaling)
+        else: # sigma_trunc
+            pop.scaleMethod.set(Scaling.SigmaTruncScaling)
+
     ga.setMinimax(Consts.minimaxType["minimize"])
 
     # Set elitism
@@ -609,6 +629,7 @@ def run_main():
     print "Crossover: " + ("Default (single_point)" if opt.crossover is None else opt.crossover)
     print "Crossover rate: " + str(opt.crossover_rate)
     print "Selector: " + opt.selector
+    print "Scaling: " + ("Default (linear)" if opt.scaling is None else opt.scaling)
     print "Generations: " + str(opt.gens)
     print "Popultation: " + str(NUM_POP)
     print "Number of elites: " + str(elite)
