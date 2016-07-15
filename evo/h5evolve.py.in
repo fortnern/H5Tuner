@@ -391,10 +391,13 @@ def run_main():
     parser.add_option("--mutation_rate", action="store", type="float", default=DEF_MUT, dest="mut", help="Mutation rate for genetic algorithm. The chance (from 0.0 to 1.0) that a parameter will be randomly changed between generations. Default is %default.")
 
     # Add crossover option
-    parser.add_option("--crossover", action="store", type="choice", choices=["edge", "ox", "singlepoint", "twopoint", "uniform"], dest="crossover", help="Genetic crossover (recombination) method. Choices are \"singlepoint\", \"twopoint\", and \"uniform\". Default is the default for pyevolve, currently singlepoint.")
+    parser.add_option("--crossover", action="store", type="choice", choices=["single_point", "two_point", "uniform"], dest="crossover", help="Genetic crossover (recombination) method. Choices are \"single_point\", \"two_point\", and \"uniform\". Default is the default for pyevolve, currently single_point.")
 
     # Add crossover rate option
     parser.add_option("--crossover_rate", action="store", type="float", default=DEF_MUT, dest="crossover_rate", help="Crossover rate for genetic algorithm. The fraction (from 0.0 to 1.0) of parameters that are exchanged between parents to form the children. Default is the default for pyevolve, currently 0.9.")
+
+    # Add selector option
+    parser.add_option("--selector", action="store", type="choice", choices=["rank", "roulette", "tournament", "tournament_alt", "uniform"], default="roulette", dest="selector", help="Genetic crossover (recombination) method. Choices are \"rank\", \"roulette\", \"tournament\", \"tournament_alt\", and \"uniform\". Default is %default.")
 
     # Add elitism option
     parser.add_option("--num_elite", action="store", type="int", dest="elite", help="Number of elites for genetic algorithm. This is the number of top-performing candidates that are passed without modification (cloned) to the next generation. Default is population / 5 (rounded down).")
@@ -555,16 +558,27 @@ def run_main():
     genome.initializator.set(Initializators.G1DListInitializatorAllele)
 
     # Set crossover
-    if opt.crossover == "singlepoint":
+    if opt.crossover == "single_point":
         genome.crossover.set(Crossovers.G1DListCrossoverSinglePoint)
-    elif opt.crossover == "twopoint":
+    elif opt.crossover == "two_point":
         genome.crossover.set(Crossovers.G1DListCrossoverTwoPoint)
     elif opt.crossover == "uniform":
         genome.crossover.set(Crossovers.G1DListCrossoverUniform)
 
     # Create genetic algorithm
     ga = GSimpleGA.GSimpleGA(genome)
-    ga.selector.set(Selectors.GRouletteWheel)
+
+    # Set selector
+    if opt.selector == "rank":
+        ga.selector.set(Selectors.GRankSelector)
+    elif opt.selector == "roulette":
+        ga.selector.set(Selectors.GRouletteWheel)
+    elif opt.selector == "tournament":
+        ga.selector.set(Selectors.GTournamentSelector)
+    elif opt.selector == "tournament_alt":
+        ga.selector.set(Selectors.GTournamentSelectorAlternative)
+    else: # uniform
+        ga.selector.set(Selectors.GUniformSelector)
 
     # Set mutation rate
     ga.setMutationRate(opt.mut);
@@ -592,8 +606,9 @@ def run_main():
     # Print options
     print "pyevolve options:"
     print "Mutation rate: " + str(opt.mut)
-    print "Crossover: " + opt.crossover
+    print "Crossover: " + ("Default (single_point)" if opt.crossover is None else opt.crossover)
     print "Crossover rate: " + str(opt.crossover_rate)
+    print "Selector: " + opt.selector
     print "Generations: " + str(opt.gens)
     print "Popultation: " + str(NUM_POP)
     print "Number of elites: " + str(elite)
