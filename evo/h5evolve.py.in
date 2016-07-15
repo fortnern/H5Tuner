@@ -31,6 +31,7 @@ from pyevolve import DBAdapters
 from pyevolve import GAllele
 from pyevolve import Mutators
 from pyevolve import Initializators
+from pyevolve import Crossovers
 from pyevolve import Consts
 
 
@@ -389,17 +390,23 @@ def run_main():
     # Add mutation rate option
     parser.add_option("--mutation_rate", action="store", type="float", default=DEF_MUT, dest="mut", help="Mutation rate for genetic algorithm. The chance (from 0.0 to 1.0) that a parameter will be randomly changed between generations. Default is %default.")
 
+    # Add crossover option
+    parser.add_option("--crossover", action="store", type="choice", choices=["edge", "ox", "singlepoint", "twopoint", "uniform"], dest="crossover", help="Genetic crossover (recombination) method. Choices are \"singlepoint\", \"twopoint\", and \"uniform\". Default is the default for pyevolve, currently singlepoint.")
+
+    # Add crossover rate option
+    parser.add_option("--crossover_rate", action="store", type="float", default=DEF_MUT, dest="crossover_rate", help="Crossover rate for genetic algorithm. The fraction (from 0.0 to 1.0) of parameters that are exchanged between parents to form the children. Default is the default for pyevolve, currently 0.9.")
+
     # Add elitism option
     parser.add_option("--num_elite", action="store", type="int", dest="elite", help="Number of elites for genetic algorithm. This is the number of top-performing candidates that are passed without modification (cloned) to the next generation. Default is population / 5 (rounded down).")
 
     # Add cost file option
     parser.add_option("--cost_file", action="store", dest="cost_file", help="Text file created by EXEC_COMMAND that contains the self-reported cost (i.e. the opposite of fitness) of the configuration, formatted as a float. By default h5evolve uses the running time of EXEC_COMMAND as the cost.")
 
-    # Add timeout option
-    parser.add_option("--timeout", action="store", type = "int", default=DEF_TIMEOUT, dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or 0 for no timeout. Default is %default.")
-
     # Add runs option
     parser.add_option("--runs", action="store", type="int", default=DEF_RUNS, dest="runs", help="Number of iterations to run for each configuration. The results of these runs are then averaged. Default is %default.")
+
+    # Add timeout option
+    parser.add_option("--timeout", action="store", type = "int", default=DEF_TIMEOUT, dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or 0 for no timeout. Default is %default.")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
@@ -533,13 +540,13 @@ def run_main():
     # Handle cost file
     cost_file = opt.cost_file
 
-    # Handle timeout
-    timeout = opt.timeout
-
     # Handle runs
     runs = opt.runs
 
+    # Handle timeout
+    timeout = opt.timeout
 
+    # Create genome
     genome = G1DList.G1DList(genome_i)
     genome.setParams(allele=setOfAlleles)
 
@@ -547,25 +554,52 @@ def run_main():
     genome.mutator.set(Mutators.G1DListMutatorAllele)
     genome.initializator.set(Initializators.G1DListInitializatorAllele)
 
+    # Set crossover
+    if opt.crossover == "singlepoint":
+        genome.crossover.set(Crossovers.G1DListCrossoverSinglePoint)
+    elif opt.crossover == "twopoint":
+        genome.crossover.set(Crossovers.G1DListCrossoverTwoPoint)
+    elif opt.crossover == "uniform":
+        genome.crossover.set(Crossovers.G1DListCrossoverUniform)
+
+    # Create genetic algorithm
     ga = GSimpleGA.GSimpleGA(genome)
     ga.selector.set(Selectors.GRouletteWheel)
+
+    # Set mutation rate
     ga.setMutationRate(opt.mut);
+
+    # Set crossover rate
+    ga.setCrossoverRate(opt.crossover_rate);
+
+    # Set number of generations
     ga.setGenerations(opt.gens)
+
     #ga.terminationCriteria.set(ConvergenceCriteria)
+
+    # Set population
     ga.setPopulationSize(NUM_POP)
+
     ga.setMinimax(Consts.minimaxType["minimize"])
+
+    # Set elitism
     if elite == 0:
         ga.setElitism(False)
     else:
         ga.setElitism(True)
         ga.setElitismReplacement(elite)
 
+    # Print options
     print "pyevolve options:"
     print "Mutation rate: " + str(opt.mut)
+    print "Crossover: " + opt.crossover
+    print "Crossover rate: " + str(opt.crossover_rate)
     print "Generations: " + str(opt.gens)
     print "Popultation: " + str(NUM_POP)
     print "Number of elites: " + str(elite)
     print 'ga.evolve'
+
+    # Evolve
     ga.evolve(freq_stats=1)
 
     print 'closing result'
