@@ -47,6 +47,8 @@ DEF_RUNS=5
 DEF_VERBOSE=2
 GLOB_COUNT=0
 
+TMP_CONFIG_FILE="__h5evolve_config.xml"
+
 pyevolve.logEnable()
 
 class Alarm(Exception):
@@ -114,9 +116,7 @@ config_feat_file = open('./config_feat.txt', 'w')
 running_time_file = open('./running_time.txt', 'w')
 perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
-def eval_func(genome):
-    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout, runs, verbose
-
+def create_config_file(genome, config_file_name):
     ####################################################################
     #
     # Create the minidom document for tunable parameters
@@ -135,93 +135,112 @@ def eval_func(genome):
     low = doc.createElement("Parallel_File_System")
     params.appendChild(low)
 
+    if ibm_lockless_i is not None and genome[ibm_lockless_i]:
+        ibm_lockless_obj = doc.createElement("IBM_lockless_io")
+        low.appendChild(ibm_lockless_obj)
+        ibm_lockless_txt = doc.createTextNode("true")
+        ibm_lockless_obj.appendChild(ibm_lockless_txt)
+
+    if ibm_largeblock_i is not None and genome[ibm_largeblock_i]:
+        ibm_largeblock_obj = doc.createElement("IBM_largeblock_io")
+        low.appendChild(ibm_largeblock_obj)
+        ibm_largeblock_txt = doc.createTextNode("true")
+        ibm_largeblock_obj.appendChild(ibm_largeblock_txt)
+
+    if strp_fac_i is not None and genome[strp_fac_i].lower() != "unset":
+        strp_fac_obj = doc.createElement("striping_factor")
+        low.appendChild(strp_fac_obj)
+        strp_fac_txt = doc.createTextNode(genome[strp_fac_i])
+        strp_fac_obj.appendChild(strp_fac_txt)
+
+    if strp_unt_i is not None and genome[strp_unt_i].lower() != "unset":
+        strp_unt_obj = doc.createElement("striping_unit")
+        low.appendChild(strp_unt_obj)
+        strp_unt_txt = doc.createTextNode(genome[strp_unt_i])
+        strp_unt_obj.appendChild(strp_unt_txt)
+
+    if cb_nds_i is not None and genome[cb_nds_i].lower() != "unset":
+        cb_n = doc.createElement("cb_nodes")
+        mid.appendChild(cb_n)
+        cb_n_txt = doc.createTextNode(genome[cb_nds_i])
+        cb_n.appendChild(cb_n_txt)
+
+    if cb_buf_size_i is not None and genome[cb_buf_size_i].lower() != "unset":
+        cb_buf = doc.createElement("cb_buffer_size")
+        mid.appendChild(cb_buf)
+        cb_buf_txt = doc.createTextNode(genome[cb_buf_size_i])
+        cb_buf.appendChild(cb_buf_txt)
+
+    if alignment_i is not None and genome[alignment_i].lower() != "unset":
+        algn = doc.createElement("alignment")
+        high.appendChild(algn)
+        algn_txt = doc.createTextNode(genome[alignment_i])
+        algn.appendChild(algn_txt)
+
+    if sieve_buf_size_i is not None and genome[sieve_buf_size_i].lower() != "unset":
+        siv_buf = doc.createElement("sieve_buf_size")
+        high.appendChild(siv_buf)
+        siv_buf_txt = doc.createTextNode(genome[sieve_buf_size_i])
+        siv_buf.appendChild(siv_buf_txt)
+
+    if chunk_i is not None and genome[chunk_i].lower() != "unset":
+        chunk = doc.createElement("chunk")
+        high.appendChild(chunk)
+        chunk_txt = doc.createTextNode(genome[chunk_i])
+        chunk.appendChild(chunk_txt)
+
+    # Write XML file
+    config_file = open(config_file_name, 'w');
+    config_file.write(doc.toprettyxml(indent="  "))
+    config_file.close()
+
+
+def eval_func(genome):
+    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout, runs, verbose
+
+    # Retrieve parameters
     if ibm_lockless_i is not None:
         this_ibm_lockless = str(genome[ibm_lockless_i])
-        if genome[ibm_lockless_i]:
-            ibm_lockless_obj = doc.createElement("IBM_lockless_io")
-            low.appendChild(ibm_lockless_obj)
-            ibm_lockless_txt = doc.createTextNode("true")
-            ibm_lockless_obj.appendChild(ibm_lockless_txt)
     else:
         this_ibm_lockless = "NA"
 
     if ibm_largeblock_i is not None:
         this_ibm_largeblock = str(genome[ibm_largeblock_i])
-        if genome[ibm_largeblock_i]:
-            ibm_largeblock_obj = doc.createElement("IBM_largeblock_io")
-            low.appendChild(ibm_largeblock_obj)
-            ibm_largeblock_txt = doc.createTextNode("true")
-            ibm_largeblock_obj.appendChild(ibm_largeblock_txt)
     else:
         this_ibm_largeblock = "NA"
 
     if strp_fac_i is not None:
         this_strp_fac = genome[strp_fac_i]
-        if this_strp_fac.lower() != "unset":
-            strp_fac_obj = doc.createElement("striping_factor")
-            low.appendChild(strp_fac_obj)
-            strp_fac_txt = doc.createTextNode(this_strp_fac)
-            strp_fac_obj.appendChild(strp_fac_txt)
     else:
         this_strp_fac = "NA"
 
     if strp_unt_i is not None:
         this_strp_unt = genome[strp_unt_i]
-        if this_strp_unt.lower() != "unset":
-            strp_unt_obj = doc.createElement("striping_unit")
-            low.appendChild(strp_unt_obj)
-            strp_unt_txt = doc.createTextNode(this_strp_unt)
-            strp_unt_obj.appendChild(strp_unt_txt)
     else:
         this_strp_unt = "NA"
 
     if cb_nds_i is not None:
         this_cb_nds = genome[cb_nds_i]
-        if this_cb_nds.lower() != "unset":
-            cb_n = doc.createElement("cb_nodes")
-            mid.appendChild(cb_n)
-            cb_n_txt = doc.createTextNode(this_cb_nds)
-            cb_n.appendChild(cb_n_txt)
     else:
         this_cb_nds = "NA"
 
     if cb_buf_size_i is not None:
         this_cb_buf_size = genome[cb_buf_size_i]
-        if this_cb_buf_size.lower() != "unset":
-            cb_buf = doc.createElement("cb_buffer_size")
-            mid.appendChild(cb_buf)
-            cb_buf_txt = doc.createTextNode(this_cb_buf_size)
-            cb_buf.appendChild(cb_buf_txt)
     else:
         this_cb_buf_size = "NA"
 
     if alignment_i is not None:
         this_align = genome[alignment_i]
-        if this_align.lower() != "unset":
-            algn = doc.createElement("alignment")
-            high.appendChild(algn)
-            algn_txt = doc.createTextNode(this_align)
-            algn.appendChild(algn_txt)
     else:
         this_align = "NA"
 
     if sieve_buf_size_i is not None:
         this_siv_buf_size = genome[sieve_buf_size_i]
-        if this_siv_buf_size.lower() != "unset":
-            siv_buf = doc.createElement("sieve_buf_size")
-            high.appendChild(siv_buf)
-            siv_buf_txt = doc.createTextNode(this_siv_buf_size)
-            siv_buf.appendChild(siv_buf_txt)
     else:
         this_siv_buf_size = "NA"
 
     if chunk_i is not None:
         this_chunk = genome[chunk_i]
-        if this_chunk.lower() != "unset":
-            chunk = doc.createElement("chunk")
-            high.appendChild(chunk)
-            chunk_txt = doc.createTextNode(this_chunk)
-            chunk.appendChild(chunk_txt)
     else:
         this_chunk = "NA"
 
@@ -239,12 +258,9 @@ def eval_func(genome):
                 print "Configuration already ran, returning %f" % (elapsed)
             return elapsed
 
-    home_dir = os.environ['PWD'];
-    file_path = home_dir + 'config.xml'
-    config_file = open(file_path, 'w');
-    config_file.write(doc.toprettyxml(indent="  "))
-    config_file.close()
-    os.environ['H5TUNER_CONFIG_FILE'] = file_path
+    # Create config file
+    create_config_file(genome, TMP_CONFIG_FILE)
+    os.environ['H5TUNER_CONFIG_FILE'] = TMP_CONFIG_FILE
 
     ####################################################################
     #
@@ -424,6 +440,9 @@ def run_main():
 
     # Add verbose option
     parser.add_option("--verbose", action="store", type = "int", default=DEF_VERBOSE, dest="verbose", help="Amount of output to print. 0 = only print pyevolve output, 1 = also print h5evolve output, 2 = also print output from EXEC_COMMAND, 3 = also print messages confirming H5Tuner was loaded (this overrides the setting of the H5TUNER_VERBOSE environment variable). Default is %default.")
+
+    # Add config output file option
+    parser.add_option("--config_output_file", action="store", dest="config_out", help="XML file for use with H5Tuner to be created and populated with the best performing parameters.")
 
     # Parse options
     opt, run_cmd = parser.parse_args()
@@ -652,11 +671,16 @@ def run_main():
         print 'ga.evolve'
 
     # Evolve
-    ga.evolve(freq_stats=1)
+    best_genome = ga.evolve(freq_stats=1)
 
     if verbose >= 1:
         print 'closing result'
     result_output.close()
+
+    if opt.config_out is not None:
+        if verbose >= 1:
+            print "creating config file"
+        create_config_file(best_genome, opt.config_out)
 
     if verbose >= 1:
         print 'Evolution Parameters:'
@@ -699,7 +723,9 @@ def run_main():
         print param_str
 
         print 'Best Solution:'
-        print ga.bestIndividual()
+        print best_genome
+
+        os.remove(TMP_CONFIG_FILE)
 
 if __name__ == "__main__":
     run_main();
