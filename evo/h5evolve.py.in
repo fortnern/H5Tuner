@@ -112,9 +112,6 @@ chunk_i = None
 # Utility files used during the evolve iterations
 #####################################################################
 result_output = open('./result_output.txt', 'w')
-config_feat_file = open('./config_feat.txt', 'w')
-running_time_file = open('./running_time.txt', 'w')
-perf_feat_filenames_file = open('./perf_feat_filenames.txt', 'w')
 
 def create_config_file(genome, config_file_name):
     ####################################################################
@@ -342,18 +339,11 @@ def eval_func(genome):
 
     str_result = str(this_gen) + ': ' + str_param + ': ' + str(elapsed)
 
-    config_feat_file.write(str_param)
-    config_feat_file.write('\n')
-
     result_output.write(str_result)
     result_output.write('\n')
-    running_time_file.write('[' + str(todays_date) + '] ' + str_result + '=' + str(valid) + '\n')
 
     sys.stdout.flush()
     result_output.flush()
-    config_feat_file.flush()
-    running_time_file.flush()
-    perf_feat_filenames_file.flush()
 
     return float(elapsed)
 
