@@ -40,6 +40,7 @@
 #include "hdf5.h"
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 #ifdef H5_HAVE_PARALLEL
 /* Temporary source code */
@@ -1059,6 +1060,9 @@ main(int argc, char **argv)
 {
     int mpi_namelen;
     char mpi_name[MPI_MAX_PROCESSOR_NAME];
+    struct timespec start, end;
+    double et;
+    FILE *cost_file;
     int i, n;
 
     MPI_Init(&argc,&argv);
@@ -1088,16 +1092,50 @@ main(int argc, char **argv)
     if (dowrite){
         MPI_BANNER("testing PHDF5 dataset using split communicators...");
         test_split_comm_access(testfiles);
+
+        /* Start clock */
+        MPI_Barrier(MPI_COMM_WORLD);
+        if(mpi_rank == 0)
+            if(clock_gettime(CLOCK_MONOTONIC, &start) < 0)
+                nerrors++;
+
         MPI_BANNER("testing PHDF5 dataset independent write...");
         phdf5writeInd(testfiles[0]);
         MPI_BANNER("testing PHDF5 dataset collective write...");
         phdf5writeAll(testfiles[1]);
     }
+    else {
+        /* Start clock */
+        MPI_Barrier(MPI_COMM_WORLD);
+        if(mpi_rank == 0)
+            if(clock_gettime(CLOCK_MONOTONIC, &start) < 0)
+                nerrors++;
+    }
+
     if (doread){
         MPI_BANNER("testing PHDF5 dataset independent read...");
         phdf5readInd(testfiles[0]);
         MPI_BANNER("testing PHDF5 dataset collective read...");
         phdf5readAll(testfiles[1]);
+    }
+
+    /* End clock */
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(mpi_rank == 0) {
+        if(clock_gettime(CLOCK_MONOTONIC, &end) < 0)
+            nerrors++;
+
+        et = (double)end.tv_sec - (double)start.tv_sec + (((double)end.tv_nsec
+                - (double)start.tv_nsec) / (double)1000000000);
+
+        /* Write cost file */
+        if(NULL == (cost_file = fopen("ph5example_cost", "w")))
+            nerrors++;
+        else {
+            fprintf(cost_file, "%f", (float)et);
+            if(EOF == fclose(cost_file))
+                nerrors++;
+        }
     }
 
     if (!(dowrite || doread)){

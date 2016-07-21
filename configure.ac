@@ -388,6 +388,6 @@ AC_CONFIG_FILES([Makefile
                  examples/Makefile
                  examples/config.xml
                  test/config.xml
-                 evo/h5evolve_sample.py])
+                 evo/h5evolve.py])
 
 AC_OUTPUT

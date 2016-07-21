@@ -1,0 +1,721 @@
+#
+# Copyright by The HDF Group.
+# All rights reserved.
+#
+# This file is part of h5tuner. The full h5tuner copyright notice,
+#  including terms governing use, modification, and redistribution, is
+# contained in the file COPYING, which can be found at the root of the
+# source code distribution tree.  If you do not have access to this file,
+# you may request a copy from help@hdfgroup.org.
+#
+
+import subprocess
+import shutil
+import os
+import os.path
+import sys
+import time
+import glob
+import datetime
+import signal
+from shutil import move
+import re
+import optparse
+
+import pyevolve
+from pyevolve import G1DList
+from pyevolve import GSimpleGA
+from pyevolve import Selectors
+from pyevolve import Statistics
+from pyevolve import DBAdapters
+from pyevolve import GAllele
+from pyevolve import Mutators
+from pyevolve import Initializators
+from pyevolve import Crossovers
+from pyevolve import Scaling
+from pyevolve import Consts
+
+
+from xml.dom.minidom import Document
+
+DEF_POP=15
+NUM_POP=0
+DEF_GENS=40
+DEF_MUT=0.15
+DEF_TIMEOUT=3540
+DEF_RUNS=5
+DEF_VERBOSE=2
+GLOB_COUNT=0
+
+TMP_CONFIG_FILE="__h5evolve_config.xml"
+
+pyevolve.logEnable()
+
+class Alarm(Exception):
+     pass
+
+def alarm_handler(signum, frame):
+     raise Alarm
+
+#####################################################################################
+#
+# Tunable Parameters
+#
+#####################################################################################
+
+###################
+# IBM
+###################
+# IBM lockless IO
+ibm_lockless_i = None
+
+# IBM largeblock IO
+ibm_largeblock_i = None
+
+###################
+# Striping
+###################
+
+# The default value for stripe_count is 1. We are going to skip 1 and 4 because they
+# are shown to be very bad. Choosing stripe_count to be -1 means stripe over all of
+# available OSTs.
+strp_fac_i = None
+
+# The default value for stripe_size is 1 MB. It has to be a multiple of page size(64KB).
+# A good stiripe size for seq.I/O is between 1 MB and 4 MB. The minimu is 512 KB and the
+# maximum is 4 GB.
+strp_unt_i = None
+
+#######################
+# Collective Buffering
+#######################
+
+# The number of aggregators
+cb_nds_i = None
+
+# Collective buffering buffer size
+cb_buf_size_i = None
+
+#################
+# HDF5
+#################
+# HDF5 Alignment
+alignment_i = None
+
+# Data Sieving buffer size
+sieve_buf_size_i = None
+
+# Chunk size
+chunk_i = None
+
+#####################################################################
+# Utility files used during the evolve iterations
+#####################################################################
+result_output = open('./result_output.txt', 'w')
+
+def create_config_file(genome, config_file_name):
+    ####################################################################
+    #
+    # Create the minidom document for tunable parameters
+    #
+    ####################################################################
+    doc = Document()
+
+    # Create the <Parameters> base element
+    params = doc.createElement("Parameters")
+    doc.appendChild(params)
+
+    high = doc.createElement("High_Level_IO_Library")
+    params.appendChild(high)
+    mid = doc.createElement("Middleware_Layer");
+    params.appendChild(mid);
+    low = doc.createElement("Parallel_File_System")
+    params.appendChild(low)
+
+    if ibm_lockless_i is not None and genome[ibm_lockless_i]:
+        ibm_lockless_obj = doc.createElement("IBM_lockless_io")
+        low.appendChild(ibm_lockless_obj)
+        ibm_lockless_txt = doc.createTextNode("true")
+        ibm_lockless_obj.appendChild(ibm_lockless_txt)
+
+    if ibm_largeblock_i is not None and genome[ibm_largeblock_i]:
+        ibm_largeblock_obj = doc.createElement("IBM_largeblock_io")
+        low.appendChild(ibm_largeblock_obj)
+        ibm_largeblock_txt = doc.createTextNode("true")
+        ibm_largeblock_obj.appendChild(ibm_largeblock_txt)
+
+    if strp_fac_i is not None and genome[strp_fac_i].lower() != "unset":
+        strp_fac_obj = doc.createElement("striping_factor")
+        low.appendChild(strp_fac_obj)
+        strp_fac_txt = doc.createTextNode(genome[strp_fac_i])
+        strp_fac_obj.appendChild(strp_fac_txt)
+
+    if strp_unt_i is not None and genome[strp_unt_i].lower() != "unset":
+        strp_unt_obj = doc.createElement("striping_unit")
+        low.appendChild(strp_unt_obj)
+        strp_unt_txt = doc.createTextNode(genome[strp_unt_i])
+        strp_unt_obj.appendChild(strp_unt_txt)
+
+    if cb_nds_i is not None and genome[cb_nds_i].lower() != "unset":
+        cb_n = doc.createElement("cb_nodes")
+        mid.appendChild(cb_n)
+        cb_n_txt = doc.createTextNode(genome[cb_nds_i])
+        cb_n.appendChild(cb_n_txt)
+
+    if cb_buf_size_i is not None and genome[cb_buf_size_i].lower() != "unset":
+        cb_buf = doc.createElement("cb_buffer_size")
+        mid.appendChild(cb_buf)
+        cb_buf_txt = doc.createTextNode(genome[cb_buf_size_i])
+        cb_buf.appendChild(cb_buf_txt)
+
+    if alignment_i is not None and genome[alignment_i].lower() != "unset":
+        algn = doc.createElement("alignment")
+        high.appendChild(algn)
+        algn_txt = doc.createTextNode(genome[alignment_i])
+        algn.appendChild(algn_txt)
+
+    if sieve_buf_size_i is not None and genome[sieve_buf_size_i].lower() != "unset":
+        siv_buf = doc.createElement("sieve_buf_size")
+        high.appendChild(siv_buf)
+        siv_buf_txt = doc.createTextNode(genome[sieve_buf_size_i])
+        siv_buf.appendChild(siv_buf_txt)
+
+    if chunk_i is not None and genome[chunk_i].lower() != "unset":
+        chunk = doc.createElement("chunk")
+        high.appendChild(chunk)
+        chunk_txt = doc.createTextNode(genome[chunk_i])
+        chunk.appendChild(chunk_txt)
+
+    # Write XML file
+    config_file = open(config_file_name, 'w');
+    config_file.write(doc.toprettyxml(indent="  "))
+    config_file.close()
+
+
+def eval_func(genome):
+    global ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout, runs, verbose
+
+    # Retrieve parameters
+    if ibm_lockless_i is not None:
+        this_ibm_lockless = str(genome[ibm_lockless_i])
+    else:
+        this_ibm_lockless = "NA"
+
+    if ibm_largeblock_i is not None:
+        this_ibm_largeblock = str(genome[ibm_largeblock_i])
+    else:
+        this_ibm_largeblock = "NA"
+
+    if strp_fac_i is not None:
+        this_strp_fac = genome[strp_fac_i]
+    else:
+        this_strp_fac = "NA"
+
+    if strp_unt_i is not None:
+        this_strp_unt = genome[strp_unt_i]
+    else:
+        this_strp_unt = "NA"
+
+    if cb_nds_i is not None:
+        this_cb_nds = genome[cb_nds_i]
+    else:
+        this_cb_nds = "NA"
+
+    if cb_buf_size_i is not None:
+        this_cb_buf_size = genome[cb_buf_size_i]
+    else:
+        this_cb_buf_size = "NA"
+
+    if alignment_i is not None:
+        this_align = genome[alignment_i]
+    else:
+        this_align = "NA"
+
+    if sieve_buf_size_i is not None:
+        this_siv_buf_size = genome[sieve_buf_size_i]
+    else:
+        this_siv_buf_size = "NA"
+
+    if chunk_i is not None:
+        this_chunk = genome[chunk_i]
+    else:
+        this_chunk = "NA"
+
+    str_param = this_ibm_lockless + ', ' + this_ibm_largeblock + ', ' + this_strp_fac + ', ' + this_strp_unt + ', ' + this_cb_nds + ', ' + this_cb_buf_size + ', ' + this_align + ', ' + this_siv_buf_size + ', ' + this_chunk
+
+    if verbose >= 1:
+        print "Evaluate Parameters config (%s): " % (str_param)
+        #sys.stdout.flush()
+
+    # check to see if result's in history; if it is, use that!
+    for line in open("result_output.txt"):
+        if str_param in line:
+            elapsed = float(line.split(": ")[2])
+            if verbose >= 1:
+                print "Configuration already ran, returning %f" % (elapsed)
+            return elapsed
+
+    # Create config file
+    create_config_file(genome, TMP_CONFIG_FILE)
+    os.environ['H5TUNER_CONFIG_FILE'] = TMP_CONFIG_FILE
+
+    ####################################################################
+    #
+    #  Application/Job Execution
+    #
+    ####################################################################
+
+    if verbose >= 1:
+        print 'Starting Application Execution'
+        #sys.stdout.flush()
+
+    todays_date = datetime.datetime.now()
+    print todays_date
+
+    if timeout > 0:
+        signal.signal(signal.SIGALRM, alarm_handler)
+
+    try:
+        valid = 0;
+        start = 0.0;
+        elapsed = 0.0;
+        tot_elapsed = 0.0;
+        for i in range(runs):
+            if cost_file is None:
+                start = time.time()
+
+            # Start alarm timer
+            if timeout > 0:
+                signal.alarm(timeout)
+
+            q = subprocess.Popen(run_cmd, stdout=subprocess.PIPE, shell=True)
+            out, err = q.communicate()
+
+            # End alarm timer
+            if timeout > 0:
+                signal.alarm(0)
+
+            if verbose >= 2:
+                print out
+
+            if q.returncode == 0:
+                if cost_file is None:
+                    elapsed = (time.time() - start)
+                else:
+                    cost_file_f = open(cost_file)
+                    elapsed = float(cost_file_f.readline())
+                    cost_file_f.close()
+                tot_elapsed += elapsed
+            else:
+                tot_elapsed = float("inf")
+                if verbose >= 1:
+                    print 'failure encountered!'
+                break
+
+    except Alarm:
+        if verbose >= 1:
+            print 'Taking too long, returning\n'
+        return float("inf")
+
+    # Calculate average running time
+    elapsed = tot_elapsed / runs
+    if verbose >= 1:
+        if cost_file is None:
+            print 'Average elapsed time:', elapsed
+        else:
+            print 'Average cost:', elapsed
+
+    ################################################################
+    # Evolution settings results update
+    ################################################################
+
+    global NUM_POP, GLOB_COUNT
+    this_gen = GLOB_COUNT / NUM_POP
+    GLOB_COUNT = GLOB_COUNT + 1
+    if verbose >= 1:
+        print 'Glog_count ', GLOB_COUNT
+        print 'this_gen', this_gen
+        print 'num pop',NUM_POP
+
+    str_result = str(this_gen) + ': ' + str_param + ': ' + str(elapsed)
+
+    result_output.write(str_result)
+    result_output.write('\n')
+
+    sys.stdout.flush()
+    result_output.flush()
+
+    return float(elapsed)
+
+#def ConvergenceCriteria(ga_engine):
+#    best = ga_engine.bestIndividual()
+    # Best Score of 128 cores is about 50 seconds
+#    return best.score <= 40
+    # Best Score of 4096 cores is about 600 seconds
+    #return best.score <= 600
+
+
+def run_main():
+    global NUM_POP, GLOB_COUNT, ibm_lockless_i, ibm_largeblock_i, strp_fac_i, strp_unt_i, cb_nds_i, cb_buf_size_i, alignment_i, sieve_buf_size_i, chunk_i, run_cmd, cost_file, timeout, runs, verbose
+
+    # Set up parser
+    parser = optparse.OptionParser()
+
+    parser.set_usage("Usage: python h5evolve [OPTION]... \"[EXEC_COMMAND]\"\n" + \
+        "Use the genetic algorithm solver pyevolve to optimize settings for EXEC_COMMAND\n" + \
+        "to minimize execution time. Only optimizes the parameters passed as option,\n" + \
+        "including --IBM_lockless_io, --IBM_largeblock_io, --striping_factor,\n" + \
+        "--striping-unit, --cb_nodes, --cb_buffer_size, --alignment, --sieve_buf_size,\n" + \
+        "and --chunk. At least 2 of these parameters must be specified.")
+
+    # Add IBM lockless IO option
+    parser.add_option("--IBM_lockless_io", action="store_true", default=False, dest="ibm_lockless", help="Enables optimization of the IBM lockless IO option, an alternate way of accessing data on GPFS. This option takes no value, setting the option allows the evolver to try with and without using this method (True and False).")
+
+    # Add IBM largeblock IO option
+    parser.add_option("--IBM_largeblock_io", action="store_true", default=False, dest="ibm_largeblock", help="Enables optimization of the IBM largeblock IO option, an alternate way of accessing data on GPFS. This option takes no value, setting the option allows the evolver to try with and without using this method (True and False).")
+
+    # Add striping factor option
+    parser.add_option("--striping_factor", action="store", dest="strp_fac", help="Enables optimization of the MPI striping factor, or the number of I/O devices the file should be striped across. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
+
+    # Add striping unit option
+    parser.add_option("--striping_unit", action="store", dest="strp_unt", help="Enables optimization of the MPI striping unit, or the stripe size to use when striping files. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
+
+    # Add collective buffering nodes option
+    parser.add_option("--cb_nodes", action="store", dest="cb_nds", help="Enables optimization of the MPI collective buffering nodes, or the number of nodes to use for collective buffering. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
+
+    # Add collective buffering buffer size option
+    parser.add_option("--cb_buffer_size", action="store", dest="cb_buf_size", help="Enables optimization of the MPI collective buffering size, or the size that can be used for collective buffering on each node. Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
+
+    # Add alignment option
+    parser.add_option("--alignment", action="store", dest="alignment", help="Enables optimization of the HDF5 threshold and alignment properties. Value should be set to a semicolon-separated list of possible values, one of which may be \"unset\" which does not set any value. Each value should follow the format \"threshold,alignment\", where threshold is the minimum block size to trigger alignment of that block on disk, and alignment is the value that all aligned blocks must be aligned to (file addresses must be a multiple of alignment)")
+
+    # Add sieve buffer size option
+    parser.add_option("--sieve_buf_size", action="store", dest="sieve_buf_size", help="Enables optimization of the HDF5 sieve buffer size property, or the size of the buffer to use to aggregate strided uncached raw data I/O (which would otherwise transalte to large numbers of small I/O operations). Value should be set to a comma-separated list of possible values, one of which may be \"unset\" which does not set any value.")
+
+    # Add chunk size option
+    parser.add_option("--chunk", action="store", dest="chunk", help="Enables optimization of the HDF5 chunk size. Value should be set to a semicolon-separated list of possible values, one of which may be \"unset\" which does not set any value. Each value is a comma-separated list of chunk dimensions. The number of chunk dimensions must be equal to the rank of the dataset. This will apply to all datasets created by EXEC_COMMAND.")
+
+    # Add population option
+    parser.add_option("--population", action="store", type="int", default=DEF_POP, dest="pop", help="Population size for genetic algorithm. Number of candidates in each generation for reproduction. Default is %default.")
+
+    # Add generations option
+    parser.add_option("--generations", action="store", type="int", default=DEF_GENS, dest="gens", help="Number of generations for genetic algorithm. This is the number of iterations that the evolver runs. Default is %default.")
+
+    # Add mutation rate option
+    parser.add_option("--mutation_rate", action="store", type="float", default=DEF_MUT, dest="mut", help="Mutation rate for genetic algorithm. The chance (from 0.0 to 1.0) that a parameter will be randomly changed between generations. Default is %default.")
+
+    # Add crossover option
+    parser.add_option("--crossover", action="store", type="choice", choices=["single_point", "two_point", "uniform"], dest="crossover", help="Genetic crossover (recombination) method. Choices are \"single_point\", \"two_point\", and \"uniform\". Default is the default for pyevolve, currently single_point.")
+
+    # Add crossover rate option
+    parser.add_option("--crossover_rate", action="store", type="float", default=DEF_MUT, dest="crossover_rate", help="Crossover rate for genetic algorithm. The fraction (from 0.0 to 1.0) of parameters that are exchanged between parents to form the children. Default is the default for pyevolve, currently 0.9.")
+
+    # Add selector option
+    parser.add_option("--selector", action="store", type="choice", choices=["rank", "roulette", "tournament", "tournament_alt", "uniform"], default="roulette", dest="selector", help="Genetic crossover (recombination) method. Choices are \"rank\", \"roulette\", \"tournament\", \"tournament_alt\", and \"uniform\". Default is %default.")
+
+    # Add scaling option
+    parser.add_option("--scaling", action="store", type="choice", choices=["boltzmann", "exponential", "linear", "power_law", "saturated", "sigma_trunc"], dest="scaling", help="Candidate score (cost) scaling method. Choices are \"boltzmann\", \"exponential\", \"linear\", \"power_law\", \"saturated\", and \"sigma_trunc\". Default is the default for pyevolve, currently linear.")
+
+    # Add elitism option
+    parser.add_option("--num_elite", action="store", type="int", dest="elite", help="Number of elites for genetic algorithm. This is the number of top-performing candidates that are passed without modification (cloned) to the next generation. Default is population / 5 (rounded down).")
+
+    # Add cost file option
+    parser.add_option("--cost_file", action="store", dest="cost_file", help="Text file created by EXEC_COMMAND that contains the self-reported cost (i.e. the opposite of fitness) of the configuration, formatted as a float. By default h5evolve uses the running time of EXEC_COMMAND as the cost.")
+
+    # Add runs option
+    parser.add_option("--runs", action="store", type="int", default=DEF_RUNS, dest="runs", help="Number of iterations to run for each configuration. The results of these runs are then averaged. Default is %default.")
+
+    # Add timeout option
+    parser.add_option("--timeout", action="store", type = "int", default=DEF_TIMEOUT, dest="timeout", help="Time (integer in seconds) to wait for EXEC_COMMAND to complete, or 0 for no timeout. Default is %default.")
+
+    # Add verbose option
+    parser.add_option("--verbose", action="store", type = "int", default=DEF_VERBOSE, dest="verbose", help="Amount of output to print. 0 = only print pyevolve output, 1 = also print h5evolve output, 2 = also print output from EXEC_COMMAND, 3 = also print messages confirming H5Tuner was loaded (this overrides the setting of the H5TUNER_VERBOSE environment variable). Default is %default.")
+
+    # Add config output file option
+    parser.add_option("--config_output_file", action="store", dest="config_out", help="XML file for use with H5Tuner to be created and populated with the best performing parameters.")
+
+    # Parse options
+    opt, run_cmd = parser.parse_args()
+
+    # Keep track of index in genome
+    genome_i = 0
+
+    # Start building genome
+    setOfAlleles = GAllele.GAlleles()
+
+    #Handle IBM lockless IO
+    if opt.ibm_lockless:
+        # Add to genome
+        gal = GAllele.GAlleleList([True, False])
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        ibm_lockless_i = genome_i
+        genome_i += 1
+
+    #Handle IBM largeblock IO
+    if opt.ibm_largeblock:
+        # Add to genome
+        gal = GAllele.GAlleleList([True, False])
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        ibm_largeblock_i = genome_i
+        genome_i += 1
+
+    # Handle striping factor
+    if opt.strp_fac is not None:
+        # Build list for genome
+        strp_fac = opt.strp_fac.replace(" ", "").split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(strp_fac)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        strp_fac_i = genome_i
+        genome_i += 1
+
+    # Handle striping unit
+    if opt.strp_unt is not None:
+        # Build list for genome
+        strp_unt = opt.strp_unt.replace(" ", "").split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(strp_unt)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        strp_unt_i = genome_i
+        genome_i += 1
+
+    # Handle collective buffering nodes
+    if opt.cb_nds is not None:
+        # Build list for genome
+        cb_nds = opt.cb_nds.replace(" ", "").split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(cb_nds)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        cb_nds_i = genome_i
+        genome_i += 1
+
+    # Handle collective buffering buffer size
+    if opt.cb_buf_size is not None:
+        # Build list for genome
+        cb_buf_size = opt.cb_buf_size.replace(" ", "").split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(cb_buf_size)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        cb_buf_size_i = genome_i
+        genome_i += 1
+
+    # Handle alignment
+    if opt.alignment is not None:
+        # Build list for genome
+        alignment_size = opt.alignment.replace(" ", "").split(";")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(alignment_size)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        alignment_i = genome_i
+        genome_i += 1
+
+    # Handle sieve buffer size
+    if opt.sieve_buf_size is not None:
+        # Build list for genome
+        sieve_buf_size = opt.sieve_buf_size.replace(" ", "").split(",")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(sieve_buf_size)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        sieve_buf_size_i = genome_i
+        genome_i += 1
+
+    # Handle chunk size
+    if opt.chunk is not None:
+        # Build list for genome
+        chunk = opt.chunk.replace(" ", "").split(";")
+
+        # Add to genome
+        gal = GAllele.GAlleleList(chunk)
+        setOfAlleles.add(gal)
+
+        # Keep track of index in genome
+        chunk_i = genome_i
+        genome_i += 1
+
+    # Handle verbose
+    verbose = opt.verbose
+    if verbose >= 3:
+        os.environ['H5TUNER_VERBOSE'] = "1"
+
+    # Handle population
+    NUM_POP = opt.pop;
+
+    # Handle elitism
+    if opt.elite is None:
+        elite = NUM_POP // 5
+    else:
+        elite = opt.elite
+
+    # Handle cost file
+    cost_file = opt.cost_file
+
+    # Handle runs
+    runs = opt.runs
+
+    # Handle timeout
+    timeout = opt.timeout
+
+    # Create genome
+    genome = G1DList.G1DList(genome_i)
+    genome.setParams(allele=setOfAlleles)
+
+    genome.evaluator.set(eval_func)
+    genome.mutator.set(Mutators.G1DListMutatorAllele)
+    genome.initializator.set(Initializators.G1DListInitializatorAllele)
+
+    # Set crossover
+    if opt.crossover == "single_point":
+        genome.crossover.set(Crossovers.G1DListCrossoverSinglePoint)
+    elif opt.crossover == "two_point":
+        genome.crossover.set(Crossovers.G1DListCrossoverTwoPoint)
+    elif opt.crossover == "uniform":
+        genome.crossover.set(Crossovers.G1DListCrossoverUniform)
+
+    # Create genetic algorithm
+    ga = GSimpleGA.GSimpleGA(genome)
+
+    # Set selector
+    if opt.selector == "rank":
+        ga.selector.set(Selectors.GRankSelector)
+    elif opt.selector == "roulette":
+        ga.selector.set(Selectors.GRouletteWheel)
+    elif opt.selector == "tournament":
+        ga.selector.set(Selectors.GTournamentSelector)
+    elif opt.selector == "tournament_alt":
+        ga.selector.set(Selectors.GTournamentSelectorAlternative)
+    else: # uniform
+        ga.selector.set(Selectors.GUniformSelector)
+
+    # Set mutation rate
+    ga.setMutationRate(opt.mut);
+
+    # Set crossover rate
+    ga.setCrossoverRate(opt.crossover_rate);
+
+    # Set number of generations
+    ga.setGenerations(opt.gens)
+
+    #ga.terminationCriteria.set(ConvergenceCriteria)
+
+    # Set population
+    ga.setPopulationSize(NUM_POP)
+
+    # Set scaling
+    if opt.scaling is not None:
+        pop = ga.getPopulation()
+        if opt.scaling == "boltzmann":
+            pop.scaleMethod.set(Scaling.BoltzmannScaling)
+        elif opt.scaling == "exponential":
+            pop.scaleMethod.set(Scaling.ExponentialScaling)
+        elif opt.scaling == "linear":
+            pop.scaleMethod.set(Scaling.LinearScaling)
+        elif opt.scaling == "power_law":
+            pop.scaleMethod.set(Scaling.PowerLawScaling)
+        elif opt.scaling == "saturated":
+            pop.scaleMethod.set(Scaling.SaturatedScaling)
+        else: # sigma_trunc
+            pop.scaleMethod.set(Scaling.SigmaTruncScaling)
+
+    ga.setMinimax(Consts.minimaxType["minimize"])
+
+    # Set elitism
+    if elite == 0:
+        ga.setElitism(False)
+    else:
+        ga.setElitism(True)
+        ga.setElitismReplacement(elite)
+
+    # Print options
+    if verbose >= 1:
+        print "pyevolve options:"
+        print "Mutation rate: " + str(opt.mut)
+        print "Crossover: " + ("Default (single_point)" if opt.crossover is None else opt.crossover)
+        print "Crossover rate: " + str(opt.crossover_rate)
+        print "Selector: " + opt.selector
+        print "Scaling: " + ("Default (linear)" if opt.scaling is None else opt.scaling)
+        print "Generations: " + str(opt.gens)
+        print "Popultation: " + str(NUM_POP)
+        print "Number of elites: " + str(elite)
+        print 'ga.evolve'
+
+    # Evolve
+    best_genome = ga.evolve(freq_stats=1)
+
+    if verbose >= 1:
+        print 'closing result'
+    result_output.close()
+
+    if opt.config_out is not None:
+        if verbose >= 1:
+            print "creating config file"
+        create_config_file(best_genome, opt.config_out)
+
+    if verbose >= 1:
+        print 'Evolution Parameters:'
+        param_str = "["
+        if ibm_lockless_i is not None:
+            param_str += "IBM_lockless_io"
+        if ibm_largeblock_i is not None:
+            if len(param_str) > 1:
+                param_str += ", "
+            param_str += "IBM_largeblock_io"
+        if strp_fac_i is not None:
+            if len(param_str) > 1:
+                param_str += ", "
+            param_str += "striping_factor"
+        if strp_unt_i is not None:
+            if len(param_str) > 1:
+                param_str += ", "
+            param_str += "striping_unit"
+        if cb_nds_i is not None:
+            if len(param_str) > 1:
+                param_str += ", "
+            param_str += "cb_nodes"
+        if cb_buf_size_i is not None:
+            if len(param_str) > 1:
+                param_str += ", "
+            param_str += "cb_buffer_size"
+        if alignment_i is not None:
+            if len(param_str) > 1:
+                param_str += ", "
+            param_str += "alignment"
+        if sieve_buf_size_i is not None:
+            if len(param_str) > 1:
+                param_str += ", "
+            param_str += "sieve_buf_size"
+        if chunk_i is not None:
+            if len(param_str) > 1:
+                param_str += ", "
+            param_str += "chunk"
+        param_str += "]"
+        print param_str
+
+        print 'Best Solution:'
+        print best_genome
+
+        os.remove(TMP_CONFIG_FILE)
+
+if __name__ == "__main__":
+    run_main();
